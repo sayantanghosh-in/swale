@@ -1,0 +1,89 @@
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+# NOTE: pnpm-lock.yaml is deliberately NOT ignored — it must be committed so
+# builds are reproducible.
+
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+dist/
+build/
+*.tsbuildinfo
+
+# ---------------------------------------------------------------------------
+# Secrets  (never commit these)
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Local Swale data  (project-specific — read this section)
+# ---------------------------------------------------------------------------
+# During development Swale will create SQLite databases, backups, and exports.
+# Exports and databases contain real personal data: notes, todos, expenses.
+# Committing one to a public repo publishes all of it. Hence the broad patterns.
+
+*.db
+*.sqlite
+*.sqlite3
+
+# WAL mode (PRAGMA journal_mode = WAL) creates these two sidecar files next to
+# every database. They appear whether or not you expect them.
+*.db-wal
+*.db-shm
+*.sqlite-wal
+*.sqlite-shm
+
+# Backup and export artifacts
+swale-backup-*.db
+swale-export-*.json
+*.export.json
+
+# A local config used for testing may hold real tokens
+.swale/
+swale.config.local.json
+
+# ---------------------------------------------------------------------------
+# Packaging artifacts
+# ---------------------------------------------------------------------------
+# `pnpm pack` / `npm pack` tarballs, produced when testing the real install path
+*.tgz
+
+# ---------------------------------------------------------------------------
+# Logs and coverage
+# ---------------------------------------------------------------------------
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+coverage/
+.nyc_output/
+
+# ---------------------------------------------------------------------------
+# Editors
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---------------------------------------------------------------------------
+# OS
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini

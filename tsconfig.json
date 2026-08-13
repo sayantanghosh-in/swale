@@ -1,0 +1,130 @@
+{
+  "compilerOptions": {
+    /* ---------------------------------------------------------------------
+     * Output target — Node 24+ only
+     * ------------------------------------------------------------------ */
+
+    // Node 24 supports all of ES2024, so there is no reason to emit older
+    // JavaScript. Deliberately not "esnext": that is a moving target and can
+    // emit syntax the installed Node doesn't have yet.
+    "target": "es2024",
+
+    // No "dom". This is a Node process — there is no `window`, `document`, or
+    // `localStorage`. Leaving "dom" in lets TypeScript happily compile code
+    // that then crashes at runtime.
+    // A browser-facing folder (a future web UI) needs its own tsconfig that
+    // DOES include "dom".
+    "lib": ["es2024"],
+
+    /* ---------------------------------------------------------------------
+     * Module system — the part that differs most from a React project
+     * ------------------------------------------------------------------ */
+
+    // "nodenext" = resolve modules exactly the way Node does. Combined with
+    // "type": "module" in package.json, this makes the project real ESM.
+    //
+    // CONSEQUENCE: relative imports need a .js extension, even though the
+    // files are .ts —
+    //     import { addTodo } from "./todos.js";   // correct
+    //     import { addTodo } from "./todos";      // ERR_MODULE_NOT_FOUND
+    //
+    // Bundlers (Vite, webpack) resolve extensionless imports for you; Node
+    // does not, and "nodenext" enforces Node's rule. The ".js" refers to the
+    // compiled output, which is why it looks wrong at first.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+
+    // Only allow globals from @types/node. Stops DOM types leaking in via some
+    // transitive dependency and re-introducing the problem "lib" avoids.
+    "types": ["node"],
+
+    // Forces `import type { Foo }` when you only mean the type. Required for
+    // correctness under esbuild-style single-file transforms, which cannot see
+    // across files to know whether an import was type-only.
+    "verbatimModuleSyntax": true,
+
+    // esbuild (used by `tsx`) compiles one file at a time. This flag makes tsc
+    // reject the patterns that would break under that model, so development and
+    // the production build behave identically.
+    "isolatedModules": true,
+
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    /* ---------------------------------------------------------------------
+     * JSX — inert until the first .tsx file exists
+     * ------------------------------------------------------------------ */
+
+    // Set now so that adding Ink later needs no tsconfig change.
+    //
+    // Worth knowing: Node 24 can execute .ts files directly, because it strips
+    // type annotations natively — no build step. But it CANNOT handle .tsx.
+    // Stripping only deletes things, whereas JSX has to be transformed into
+    // function calls. Node also does not type-check at all; it reads no
+    // tsconfig at runtime.
+    //
+    // So: run development through `tsx` (handles .ts and .tsx identically),
+    // and run `tsc --noEmit` separately as the actual type check.
+    "jsx": "react-jsx",
+
+    /* ---------------------------------------------------------------------
+     * Type-checking strictness
+     * ------------------------------------------------------------------ */
+
+    // On from commit one. Enabling it later means fixing hundreds of errors in
+    // a single sitting.
+    "strict": true,
+
+    // Makes array and record access return `T | undefined` instead of `T`.
+    // Most valuable in a storage layer, where a row lookup genuinely can come
+    // back empty — this forces you to handle that case. The single most useful
+    // check beyond `strict`. If it gets noisy, set it to false rather than
+    // scattering `!` through the code.
+    "noUncheckedIndexedAccess": true,
+
+    "noFallthroughCasesInSwitch": true,
+
+    // macOS has a case-insensitive filesystem; Linux CI does not. Without this,
+    // `import "./Todos.js"` for a file named `todos.ts` works locally and fails
+    // in CI.
+    "forceConsistentCasingInFileNames": true,
+
+    // Don't type-check inside node_modules. Keeps builds fast and stops a
+    // dependency's type bug from failing your build.
+    "skipLibCheck": true,
+
+    /* ---------------------------------------------------------------------
+     * Emit
+     * ------------------------------------------------------------------ */
+
+    // Sources live at the repo root (index.ts, core/, …), so the root is the
+    // base for output paths: index.ts -> dist/index.js, core/x.ts -> dist/core/x.js
+    "rootDir": ".",
+    "outDir": "dist",
+    "sourceMap": true,
+
+    // Published to npm, and consumable programmatically — not just as a CLI —
+    // so emit .d.ts alongside the JavaScript. Without these, anyone doing
+    // `import { ... } from "swale"` in TypeScript gets no types at all.
+    //
+    // Emitting them is necessary but not sufficient: package.json also needs an
+    // "exports" map with a "types" condition, otherwise modern resolvers never
+    // find the .d.ts files.
+    "declaration": true,
+
+    // Lets a consumer's editor jump from a type definition to the original .ts
+    // source. Only useful if "src" is included in package.json "files";
+    // harmless if not.
+    "declarationMap": true
+  },
+
+  // Every .ts/.tsx file under the repo root. Using a glob rather than listing
+  // folders means new ones (cli/, tui/, bot/) are picked up automatically —
+  // a file NOT matched here is invisible to this config, which is a confusing
+  // failure: the editor falls back to defaults and reports missing Node types.
+  "include": ["**/*.ts", "**/*.tsx"],
+
+  // "web" is pre-emptive: a browser-facing folder would need its own tsconfig
+  // with "dom" in lib, so it must stay out of this one.
+  "exclude": ["node_modules", "dist", "web"]
+}

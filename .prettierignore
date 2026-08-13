@@ -1,0 +1,15 @@
+# Build output
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Lockfile — machine-generated; formatting it creates pointless diff churn
+pnpm-lock.yaml
+
+# Generated / data
+coverage/
+*.db
+*.sqlite
+*-export-*.json

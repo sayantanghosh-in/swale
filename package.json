@@ -1,0 +1,52 @@
+{
+  "name": "swale",
+  "version": "0.1.0",
+  "description": "Multi-interface developer life assistant unifying GitHub PRs, notes, TODOs, and personal expenses.",
+  "keywords": [
+    "swale",
+    "dev",
+    "life-assistant",
+    "dev",
+    "life",
+    "todo",
+    "note",
+    "PR",
+    "github",
+    "telegram",
+    "AI",
+    "agent",
+    "Ollama",
+    "qwen",
+    "ai",
+    "sdk",
+    "vercel-ai-sdk"
+  ],
+  "homepage": "https://github.com/sayantanghosh-in/swale#readme",
+  "bugs": {
+    "url": "https://github.com/sayantanghosh-in/swale/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sayantanghosh-in/swale.git"
+  },
+  "license": "MIT",
+  "author": "Sayantan Ghosh <sayantan.ghosh03@gmail.com> (https://sayantanghosh.in)",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "tsx index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
