@@ -23,6 +23,13 @@ export const createUserObject = (
   };
 };
 
+/**
+ * @TODO - will be updated later on with an authentication system
+ *  */
+export const getFirstUser = (): UserRecord | undefined => {
+  return db.prepare("SELECT * FROM users LIMIT 1").get() as UserRecord | undefined;
+};
+
 export const insertUser = (userObj: UserRecord): { success: boolean } => {
   // insert the user to the 'users' table
   const preparedInsert = db.prepare(

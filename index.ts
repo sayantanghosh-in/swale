@@ -1,9 +1,10 @@
 import { program } from "commander";
-import { db } from "./core/db.js";
 import readline from "readline/promises";
 import { SWALE_GITHUB_ISSES_LINK } from "./core/constants.js";
-import { createUserObject, insertUser } from "./core/users/main.js";
+import { createUserObject, getFirstUser, insertUser } from "./core/users/main.js";
 import { parsePackageJsonContents } from "./core/utils.js";
+import { executeTodoAction } from "./core/todos/utils.js";
+import type { TodoAction, UserRecord } from "./core/models.js";
 
 const packageJsonContents = parsePackageJsonContents();
 
@@ -13,7 +14,7 @@ program
   .description(packageJsonContents?.description)
   .version(packageJsonContents?.version)
   .hook("preSubcommand", async () => {
-    const firstUserResult = db.prepare("SELECT * FROM users LIMIT 1").get();
+    const firstUserResult = getFirstUser();
     let userCount: number = 0;
 
     if (!!firstUserResult?.id) {
@@ -75,8 +76,13 @@ program
 program
   .command("todo")
   .argument("<action>", "add | delete | list | read | update")
-  .action((action: string) => {
-    console.log(`Todo called with action: ${action}`);
+  .action(async (action: TodoAction) => {
+    const firstUserResult = getFirstUser();
+    if (firstUserResult?.id) {
+      executeTodoAction(action, (firstUserResult as UserRecord).email);
+    } else {
+      console.error("ERROR_NO_USER_FOUND");
+    }
   });
 
 program
