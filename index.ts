@@ -19,39 +19,30 @@ program
   .version(packageJsonContents?.version)
   .hook("preSubcommand", async () => {
     const firstUserResult = getFirstUser();
-    let userCount: number = 0;
 
     if (!!firstUserResult?.id) {
       console.log(`Welcome back ${firstUserResult.name}!\n`);
       return;
     }
 
-    /**
-     * if a user exists, display a greeting.
-     * @TODO - this will be replaced with a password
-     * based authentication later.
-     */
-    if (userCount > 0) {
-      console.log(`Welcome back ${firstUserResult?.name}!`);
+    if (!process.stdin.isTTY) {
+      console.error("Swale needs an interactive terminal for first-time setup.");
+      process.exit(1);
     }
-
-    let name: string = "";
-    let email: string = "";
-    let phone: string = "";
 
     /**
      * Keep on asking for the details from the user because without a user,
      * no operation is permitted in the tool.
      */
-    while (userCount === 0 && !name && !email && !phone) {
+    while (true) {
       const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
       });
 
-      name = await rl.question("Name: ");
-      email = await rl.question("Email: ");
-      phone = await rl.question("Phone (with country code): ");
+      const name = await rl.question("Name: ");
+      const email = await rl.question("Email: ");
+      const phone = await rl.question("Phone (with country code): ");
       rl.close();
 
       const selectedCurrency = (await select({
@@ -73,10 +64,12 @@ program
           console.log(
             `${createUserObjectResult.userObj.name}, you have been added successfully...`,
           );
+          break;
         } else {
           console.error(
             `We had a issue on our end. Please report the issue here: ${SWALE_GITHUB_ISSES_LINK}`,
           );
+          process.exit(1);
         }
       } else {
         console.error(

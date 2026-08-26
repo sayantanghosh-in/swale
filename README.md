@@ -39,8 +39,8 @@ Swale keeps the small things a developer accumulates during a working day — a 
 
 ## Requirements
 
-| | |
-|---|---|
+|             |             |
+| ----------- | ----------- |
 | **Node.js** | 24 or later |
 
 Swale relies on Node's built-in `node:sqlite` module, which is only available from Node 22.5 onward and is used here in its Node 24 form. Check your version with `node --version`.
@@ -97,7 +97,7 @@ Add your first todo:
 ```bash
 $ swale todo add
 Enter todo: Review the authentication pull request
-Todo added succesfully! To view the entire list use `swale todo list`
+Todo added successfully! To view the entire list use `swale todo list`
 ```
 
 ---
@@ -118,13 +118,13 @@ Record IDs are UUIDs, shown in the output of every `list` and `read`. Copy the I
 
 Track tasks.
 
-| Command | Description |
-|---|---|
-| `swale todo add` | Prompts for the todo text and saves it |
-| `swale todo list` | Lists all of your todos, newest activity first |
-| `swale todo read <todoId>` | Shows a single todo in full |
+| Command                      | Description                                       |
+| ---------------------------- | ------------------------------------------------- |
+| `swale todo add`             | Prompts for the todo text and saves it            |
+| `swale todo list`            | Lists all of your todos, newest activity first    |
+| `swale todo read <todoId>`   | Shows a single todo in full                       |
 | `swale todo update <todoId>` | Prompts for replacement text and updates the todo |
-| `swale todo delete <todoId>` | Permanently deletes the todo |
+| `swale todo delete <todoId>` | Permanently deletes the todo                      |
 
 ```bash
 $ swale todo list
@@ -137,42 +137,42 @@ pending | Created by: Ada Lovelace <ada@example.com> | Created: 5 minutes ago
 
 Capture short pieces of text you want to keep.
 
-| Command | Description |
-|---|---|
-| `swale note add` | Prompts for the note text and saves it |
-| `swale note list` | Lists all of your notes |
-| `swale note read <noteId>` | Shows a single note in full |
+| Command                      | Description                                       |
+| ---------------------------- | ------------------------------------------------- |
+| `swale note add`             | Prompts for the note text and saves it            |
+| `swale note list`            | Lists all of your notes                           |
+| `swale note read <noteId>`   | Shows a single note in full                       |
 | `swale note update <noteId>` | Prompts for replacement text and updates the note |
-| `swale note delete <noteId>` | Permanently deletes the note |
+| `swale note delete <noteId>` | Permanently deletes the note                      |
 
 ### `swale expense`
 
 Record personal spending. Amounts are displayed in the currency chosen during setup.
 
-| Command | Description |
-|---|---|
-| `swale expense add` | Prompts for a description and an amount |
-| `swale expense list` | Lists all of your expenses |
-| `swale expense filter` | Prompts for text and lists expenses whose description matches, in full or in part |
-| `swale expense read <expenseId>` | Shows a single expense in full |
-| `swale expense update <expenseId>` | Asks whether to change the amount, the description, or both |
-| `swale expense delete <expenseId>` | Permanently deletes the expense |
+| Command                            | Description                                                                       |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
+| `swale expense add`                | Prompts for a description and an amount                                           |
+| `swale expense list`               | Lists all of your expenses                                                        |
+| `swale expense filter`             | Prompts for text and lists expenses whose description matches, in full or in part |
+| `swale expense read <expenseId>`   | Shows a single expense in full                                                    |
+| `swale expense update <expenseId>` | Asks whether to change the amount, the description, or both                       |
+| `swale expense delete <expenseId>` | Permanently deletes the expense                                                   |
 
 ```bash
 $ swale expense add
 What did you spend on? Team coffee
 How much did you spend (default currency: INR)? 240
-Expense added succesfully! To view the entire list use `swale expense list`
+Expense added successfully! To view the entire list use `swale expense list`
 ```
 
 Supported currencies: `INR`, `USD`, `EUR`, `GBP`, and `Other`. Choosing `Other` displays raw amounts without a currency symbol.
 
 ### Global options
 
-| Option | Description |
-|---|---|
-| `-V`, `--version` | Print the installed version |
-| `-h`, `--help` | Show help. Also available per command, e.g. `swale todo --help` |
+| Option            | Description                                                     |
+| ----------------- | --------------------------------------------------------------- |
+| `-V`, `--version` | Print the installed version                                     |
+| `-h`, `--help`    | Show help. Also available per command, e.g. `swale todo --help` |
 
 ---
 
@@ -180,10 +180,10 @@ Supported currencies: `INR`, `USD`, `EUR`, `GBP`, and `Other`. Choosing `Other` 
 
 Swale keeps all of your data in a single SQLite database named `data.db`, inside a directory it creates on first run.
 
-| Platform | Location |
-|---|---|
-| **macOS** | `~/.swale/data.db` |
-| **Linux** | `~/.swale/data.db` |
+| Platform    | Location                                                                             |
+| ----------- | ------------------------------------------------------------------------------------ |
+| **macOS**   | `~/.swale/data.db`                                                                   |
+| **Linux**   | `~/.swale/data.db`                                                                   |
 | **Windows** | `%APPDATA%\swale\data.db` — typically `C:\Users\<you>\AppData\Roaming\swale\data.db` |
 
 > On Windows, in the unusual case that the `APPDATA` environment variable is not set, Swale falls

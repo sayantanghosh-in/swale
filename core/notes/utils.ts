@@ -20,7 +20,7 @@ export const executeNoteAction = async (action: NoteAction, createdBy: string, i
       if (noteRecordResponse.success) {
         const addNoteResponse = addNote(noteRecordResponse.noteObj);
         if (addNoteResponse.success) {
-          console.log("Note added succesfully! To view the entire list use `swale note list`");
+          console.log("Note added successfully! To view the entire list use `swale note list`");
         }
       } else {
         console.log("ERROR_INVALID_NOTE_SHAPE");

@@ -42,7 +42,7 @@ export const executeExpenseAction = async (
         const addExpenseResponse = addExpense(expenseRecordResponse.expenseObj);
         if (addExpenseResponse.success) {
           console.log(
-            "Expense added succesfully! To view the entire list use `swale expense list`",
+            "Expense added successfully! To view the entire list use `swale expense list`",
           );
         }
       } else {

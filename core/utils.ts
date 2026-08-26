@@ -1,7 +1,27 @@
-import fs, { readFileSync } from "node:fs";
+import fs, { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PackageJsonContents } from "./models.js";
+
+/**
+ * Locates this package's own package.json by walking up from this file's
+ * directory. Cannot use process.cwd(): for a globally installed CLI that is
+ * whatever directory the user happens to be in, not the install location.
+ */
+const findPackageJsonPath = (): string | undefined => {
+  let dir = import.meta.dirname;
+
+  for (let i = 0; i < 5; i++) {
+    const candidate = path.join(dir, "package.json");
+    if (existsSync(candidate)) return candidate;
+
+    const parent = path.dirname(dir);
+    if (parent === dir) break; // hit the filesystem root
+    dir = parent;
+  }
+
+  return undefined;
+};
 
 export const parsePackageJsonContents = (): PackageJsonContents => {
   const packageJsonFileData: PackageJsonContents = {
@@ -10,7 +30,10 @@ export const parsePackageJsonContents = (): PackageJsonContents => {
     version: "",
   };
   try {
-    const data = readFileSync(path.join(process.cwd(), "package.json"), "utf8");
+    const packageJsonPath = findPackageJsonPath();
+    if (!packageJsonPath) return packageJsonFileData;
+
+    const data = readFileSync(packageJsonPath, "utf8");
     const parsedPackageJson = JSON.parse(data);
     packageJsonFileData["description"] = parsedPackageJson["description"] || "";
     packageJsonFileData["name"] = parsedPackageJson["name"] || "";

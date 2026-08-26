@@ -20,7 +20,7 @@ export const executeTodoAction = async (action: TodoAction, createdBy: string, i
       if (todoRecordResponse.success) {
         const addTodoResponse = addTodo(todoRecordResponse.todoObj);
         if (addTodoResponse.success) {
-          console.log("Todo added succesfully! To view the entire list use `swale todo list`");
+          console.log("Todo added successfully! To view the entire list use `swale todo list`");
         }
       } else {
         console.log("ERROR_INVALID_TODO_SHAPE");
