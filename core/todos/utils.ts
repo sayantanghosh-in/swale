@@ -3,7 +3,7 @@ import readline from "readline/promises";
 import { TodoActionSchema, type TodoAction } from "../models.js";
 import { addTodo, createTodoObject, deleteTodo, listTodos, readTodo, updateTodo } from "./main.js";
 
-export const executeTodoAction = async (action: TodoAction, userId: string, id: string = "") => {
+export const executeTodoAction = async (action: TodoAction, createdBy: string, id: string = "") => {
   if (TodoActionSchema.safeParse(action).success === false) {
     console.error("ERROR_INVALID_TODO_ACTION");
   }
@@ -16,7 +16,7 @@ export const executeTodoAction = async (action: TodoAction, userId: string, id: 
 
       const text: string = await rl.question("Enter todo: ");
       rl.close();
-      const todoRecordResponse = createTodoObject(text, userId, "todo");
+      const todoRecordResponse = createTodoObject(text, createdBy, "todo");
       if (todoRecordResponse.success) {
         const addTodoResponse = addTodo(todoRecordResponse.todoObj);
         if (addTodoResponse.success) {
@@ -29,7 +29,7 @@ export const executeTodoAction = async (action: TodoAction, userId: string, id: 
     }
 
     case "list": {
-      const todos = listTodos(userId);
+      const todos = listTodos(createdBy);
       if (Array.isArray(todos)) {
         if (todos.length) {
           todos.map((todo) => {
@@ -54,7 +54,7 @@ export const executeTodoAction = async (action: TodoAction, userId: string, id: 
     }
 
     case "read": {
-      const todo = readTodo(userId, id);
+      const todo = readTodo(createdBy, id);
       if (todo?.id) {
         const utcDateString = (todo?.updated_at as string).replace(" ", "T") + "Z";
         const isCreatedButNotEdited = isEqual(
@@ -82,7 +82,7 @@ export const executeTodoAction = async (action: TodoAction, userId: string, id: 
 
       const text: string = await rl.question("Enter updated todo: ");
       rl.close();
-      const updateTodoResponse = updateTodo(userId, id, text);
+      const updateTodoResponse = updateTodo(createdBy, id, text);
       if (updateTodoResponse?.success) {
         console.log(
           `The Todo record with ID: ${id} has been updated successfully. View the updated record with \`swale todo read ${id}\``,
@@ -102,7 +102,7 @@ export const executeTodoAction = async (action: TodoAction, userId: string, id: 
     }
 
     case "delete": {
-      const deleteTodoResponse = deleteTodo(userId, id);
+      const deleteTodoResponse = deleteTodo(createdBy, id);
       if (deleteTodoResponse?.success) {
         console.log(
           `The Todo record with ID: ${id} has been deleted successfully. View all todos with \`swale todo list\``,

@@ -3,7 +3,7 @@ import readline from "readline/promises";
 import { NoteActionSchema, type NoteAction } from "../models.js";
 import { addNote, createNoteObject, deleteNote, listNotes, readNote, updateNote } from "./main.js";
 
-export const executeNoteAction = async (action: NoteAction, email: string, id: string = "") => {
+export const executeNoteAction = async (action: NoteAction, createdBy: string, id: string = "") => {
   if (NoteActionSchema.safeParse(action).success === false) {
     console.error("ERROR_INVALID_NOTE_ACTION");
   }
@@ -16,7 +16,7 @@ export const executeNoteAction = async (action: NoteAction, email: string, id: s
 
       const text: string = await rl.question("Enter note: ");
       rl.close();
-      const noteRecordResponse = createNoteObject(text, email);
+      const noteRecordResponse = createNoteObject(text, createdBy);
       if (noteRecordResponse.success) {
         const addNoteResponse = addNote(noteRecordResponse.noteObj);
         if (addNoteResponse.success) {
@@ -29,7 +29,7 @@ export const executeNoteAction = async (action: NoteAction, email: string, id: s
     }
 
     case "list": {
-      const notes = listNotes(email);
+      const notes = listNotes(createdBy);
       if (Array.isArray(notes)) {
         if (notes.length) {
           console.log("Notes\n");
@@ -55,7 +55,7 @@ export const executeNoteAction = async (action: NoteAction, email: string, id: s
     }
 
     case "read": {
-      const note = readNote(email, id);
+      const note = readNote(createdBy, id);
       if (note?.id) {
         const utcDateString = (note?.updated_at as string).replace(" ", "T") + "Z";
         const isCreatedButNotEdited = isEqual(
@@ -83,7 +83,7 @@ export const executeNoteAction = async (action: NoteAction, email: string, id: s
 
       const text: string = await rl.question("Enter updated note: ");
       rl.close();
-      const updateNoteResponse = updateNote(email, id, text);
+      const updateNoteResponse = updateNote(createdBy, id, text);
       if (updateNoteResponse?.success) {
         console.log(
           `The note record with ID: ${id} has been updated successfully. View the updated record with \`swale note read ${id}\``,
@@ -103,7 +103,7 @@ export const executeNoteAction = async (action: NoteAction, email: string, id: s
     }
 
     case "delete": {
-      const deleteNoteResponse = deleteNote(email, id);
+      const deleteNoteResponse = deleteNote(createdBy, id);
       if (deleteNoteResponse?.success) {
         console.log(
           `The note record with ID: ${id} has been deleted successfully. View all notes with \`swale note list\``,

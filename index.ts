@@ -2,7 +2,8 @@ import { program } from "commander";
 import readline from "readline/promises";
 import { select } from "@inquirer/prompts";
 import { SWALE_GITHUB_ISSES_LINK } from "./core/constants.js";
-import { type TodoAction, type UserRecord } from "./core/models.js";
+import { executeExpenseAction } from "./core/expenses/utils.js";
+import { type SupportedCurrencies, type TodoAction, type UserRecord } from "./core/models.js";
 import { executeNoteAction } from "./core/notes/utils.js";
 import { executeTodoAction } from "./core/todos/utils.js";
 import { createUserObject, getFirstUser, insertUser } from "./core/users/main.js";
@@ -53,14 +54,14 @@ program
       rl.close();
 
       const selectedCurrency = (await select({
-        message: "Select a package manager",
+        message: "Select a currency:",
         choices: ["INR", "USD", "EUR", "GBP", "Other"].map((currency) => {
           return {
             name: currency,
             value: currency,
           };
         }),
-      })) as "INR" | "USD" | "EUR" | "GBP" | "Other";
+      })) as SupportedCurrencies;
 
       // create and validate the user object based on the user input
       const createUserObjectResult = createUserObject(name, email, phone, selectedCurrency);
@@ -101,8 +102,19 @@ program
 program
   .command("expense")
   .argument("<action>", "add | delete | list | read | update")
-  .action((action: string) => {
-    console.log(`Expense called with action: ${action}`);
+  .argument("[expenseId]", "the uuid of the note item")
+  .action(async (action: TodoAction, expenseId?: string) => {
+    const firstUserResult = getFirstUser();
+    if (firstUserResult?.id) {
+      executeExpenseAction(
+        action,
+        (firstUserResult as UserRecord).id,
+        (firstUserResult as UserRecord).currency,
+        expenseId,
+      );
+    } else {
+      console.error("ERROR_NO_USER_FOUND");
+    }
   });
 
 program

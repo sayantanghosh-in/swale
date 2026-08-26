@@ -24,7 +24,7 @@ export const createTodoObject = (
 };
 
 export const addTodo = (todo: TodoRecord) => {
-  // add the user to the 'users' table
+  // add the todo to the 'todos' table
   const preparedInsert = db.prepare(
     "INSERT INTO todos (id, text, status, created_at, updated_at, created_by) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)",
   );

@@ -22,7 +22,7 @@ export const createNoteObject = (
 };
 
 export const addNote = (note: NoteRecord) => {
-  // add the user to the 'users' table
+  // add the note to the 'notes' table
   const preparedInsert = db.prepare(
     "INSERT INTO notes (id, text, created_at, updated_at, created_by) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)",
   );

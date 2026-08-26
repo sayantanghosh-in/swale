@@ -43,7 +43,7 @@ db.exec(`
     created_by TEXT NOT NULL,
     
     -- Foreign Key Constraint
-    CONSTRAINT fk_todos_users
+    CONSTRAINT fk_expenses_users
       FOREIGN KEY (created_by) 
       REFERENCES users(id) 
       ON DELETE CASCADE 
@@ -60,7 +60,7 @@ db.exec(`
     created_by TEXT NOT NULL,
     
     -- Foreign Key Constraint
-    CONSTRAINT fk_todos_users
+    CONSTRAINT fk_notes_users
       FOREIGN KEY (created_by) 
       REFERENCES users(id) 
       ON DELETE CASCADE 
