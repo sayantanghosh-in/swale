@@ -39,11 +39,13 @@ Swale keeps the small things a developer accumulates during a working day — a 
 
 ## Requirements
 
-|             |             |
-| ----------- | ----------- |
-| **Node.js** | 24 or later |
+**Node.js 24 or later.** Swale stores your data using Node's built-in `node:sqlite` module, which is why a recent Node release is required — there are no other runtime dependencies to install.
 
-Swale relies on Node's built-in `node:sqlite` module, which is only available from Node 22.5 onward and is used here in its Node 24 form. Check your version with `node --version`.
+Check your version with:
+
+```bash
+node --version
+```
 
 ---
 
