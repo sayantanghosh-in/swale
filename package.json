@@ -1,5 +1,5 @@
 {
-  "name": "swale",
+  "name": "@itssayantan/swale",
   "version": "0.1.0",
   "description": "Multi-interface developer life assistant unifying GitHub PRs, notes, TODOs, and personal expenses.",
   "keywords": [

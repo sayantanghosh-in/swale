@@ -2,9 +2,9 @@
 
 A local-first command-line assistant for developers — track your TODOs, notes, and personal expenses from the terminal, with everything stored on your own machine.
 
-[![npm version](https://img.shields.io/npm/v/swale.svg)](https://www.npmjs.com/package/swale)
-[![license](https://img.shields.io/npm/l/swale.svg)](./LICENSE)
-[![node](https://img.shields.io/node/v/swale.svg)](https://nodejs.org)
+[![npm version](https://img.shields.io/npm/v/@itssayantan/swale.svg)](https://www.npmjs.com/package/@itssayantan/swale)
+[![license](https://img.shields.io/npm/l/@itssayantan/swale.svg)](./LICENSE)
+[![node](https://img.shields.io/node/v/@itssayantan/swale.svg)](https://nodejs.org)
 
 ---
 
@@ -52,21 +52,23 @@ Swale relies on Node's built-in `node:sqlite` module, which is only available fr
 Install globally to get the `swale` command on your `PATH`:
 
 ```bash
-npm install -g swale
+npm install -g @itssayantan/swale
 ```
 
 Using another package manager:
 
 ```bash
-pnpm add -g swale
-yarn global add swale
+pnpm add -g @itssayantan/swale
+yarn global add @itssayantan/swale
 ```
 
 Or run it without installing:
 
 ```bash
-npx swale todo list
+npx @itssayantan/swale todo list
 ```
+
+> The package is published as `@itssayantan/swale`; the command it installs is `swale`.
 
 ---
 
