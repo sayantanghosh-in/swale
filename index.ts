@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { program } from "commander";
 import readline from "readline/promises";
 import { select } from "@inquirer/prompts";

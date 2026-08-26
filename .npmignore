@@ -1,0 +1,54 @@
+# NOTE ON PRECEDENCE
+# The "files" array in package.json takes priority over this file. While
+# "files": ["dist"] is set, npm uses that allowlist and ignores everything
+# below. This file exists as a safety net: if "files" is ever removed, npm
+# would otherwise fall back to .gitignore — which excludes dist/ and would
+# publish an empty, broken package.
+
+# Source — only compiled output in dist/ ships
+core/
+index.ts
+*.ts
+!*.d.ts
+
+# Build and tooling config
+tsconfig.json
+.prettierrc.json
+.prettierignore
+.editorconfig
+pnpm-workspace.yaml
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Editor and local agent settings
+.vscode/
+.idea/
+.claude/
+
+# CI and repo metadata
+.github/
+.git/
+.gitignore
+docs/
+
+# Local data and secrets — must never be published
+.env
+.env.*
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+swale-backup-*.db
+swale-export-*.json
+
+# Packaging artifacts, logs, coverage
+*.tgz
+*.log
+logs/
+coverage/
+.nyc_output/
+
+# OS noise
+.DS_Store
+Thumbs.db
