@@ -1,10 +1,12 @@
 import { program } from "commander";
 import readline from "readline/promises";
+import { select } from "@inquirer/prompts";
 import { SWALE_GITHUB_ISSES_LINK } from "./core/constants.js";
+import { type TodoAction, type UserRecord } from "./core/models.js";
+import { executeNoteAction } from "./core/notes/utils.js";
+import { executeTodoAction } from "./core/todos/utils.js";
 import { createUserObject, getFirstUser, insertUser } from "./core/users/main.js";
 import { parsePackageJsonContents } from "./core/utils.js";
-import { executeTodoAction } from "./core/todos/utils.js";
-import type { TodoAction, UserRecord } from "./core/models.js";
 
 const packageJsonContents = parsePackageJsonContents();
 
@@ -50,8 +52,18 @@ program
       phone = await rl.question("Phone (with country code): ");
       rl.close();
 
+      const selectedCurrency = (await select({
+        message: "Select a package manager",
+        choices: ["INR", "USD", "EUR", "GBP", "Other"].map((currency) => {
+          return {
+            name: currency,
+            value: currency,
+          };
+        }),
+      })) as "INR" | "USD" | "EUR" | "GBP" | "Other";
+
       // create and validate the user object based on the user input
-      const createUserObjectResult = createUserObject(name, email, phone);
+      const createUserObjectResult = createUserObject(name, email, phone, selectedCurrency);
 
       if (createUserObjectResult.success && !!createUserObjectResult?.userObj?.id) {
         const insertUserResult = insertUser(createUserObjectResult.userObj);
@@ -80,7 +92,7 @@ program
   .action(async (action: TodoAction, todoId?: string) => {
     const firstUserResult = getFirstUser();
     if (firstUserResult?.id) {
-      executeTodoAction(action, (firstUserResult as UserRecord).email, todoId);
+      executeTodoAction(action, (firstUserResult as UserRecord).id, todoId);
     } else {
       console.error("ERROR_NO_USER_FOUND");
     }
@@ -96,8 +108,14 @@ program
 program
   .command("note")
   .argument("<action>", "add | delete | list | read | update")
-  .action((action: string) => {
-    console.log(`Note called with action: ${action}`);
+  .argument("[noteId]", "the uuid of the note item")
+  .action(async (action: TodoAction, noteId?: string) => {
+    const firstUserResult = getFirstUser();
+    if (firstUserResult?.id) {
+      executeNoteAction(action, (firstUserResult as UserRecord).id, noteId);
+    } else {
+      console.error("ERROR_NO_USER_FOUND");
+    }
   });
 
 await program.parseAsync();

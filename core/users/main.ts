@@ -1,17 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { db } from "../db.js";
-import { UserSchema, type UserRecord } from "../models.js";
+import { UserSchema, type SupportedCurrencies, type UserRecord } from "../models.js";
 
 export const createUserObject = (
   name: string,
   email: string,
   phone: string,
+  currency: SupportedCurrencies,
 ): { success: boolean; userObj: UserRecord } => {
   const userObj: UserRecord = {
     id: randomUUID(),
     name,
     email,
     phone,
+    currency,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -33,13 +35,14 @@ export const getFirstUser = (): UserRecord | undefined => {
 export const insertUser = (userObj: UserRecord): { success: boolean } => {
   // insert the user to the 'users' table
   const preparedInsert = db.prepare(
-    "INSERT INTO users (id, name, email, phone, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO users (id, name, email, phone, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
   );
   const ranInsertStatement = preparedInsert.run(
     userObj.id,
     userObj.name,
     userObj.email,
     userObj.phone,
+    userObj.currency,
     userObj.createdAt.toString(),
     userObj.updatedAt.toString(),
   );

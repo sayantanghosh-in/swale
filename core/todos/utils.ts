@@ -1,9 +1,9 @@
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isEqual } from "date-fns";
 import readline from "readline/promises";
 import { TodoActionSchema, type TodoAction } from "../models.js";
 import { addTodo, createTodoObject, deleteTodo, listTodos, readTodo, updateTodo } from "./main.js";
 
-export const executeTodoAction = async (action: TodoAction, email: string, id: string = "") => {
+export const executeTodoAction = async (action: TodoAction, userId: string, id: string = "") => {
   if (TodoActionSchema.safeParse(action).success === false) {
     console.error("ERROR_INVALID_TODO_ACTION");
   }
@@ -16,7 +16,7 @@ export const executeTodoAction = async (action: TodoAction, email: string, id: s
 
       const text: string = await rl.question("Enter todo: ");
       rl.close();
-      const todoRecordResponse = createTodoObject(text, email, "todo");
+      const todoRecordResponse = createTodoObject(text, userId, "todo");
       if (todoRecordResponse.success) {
         const addTodoResponse = addTodo(todoRecordResponse.todoObj);
         if (addTodoResponse.success) {
@@ -29,14 +29,19 @@ export const executeTodoAction = async (action: TodoAction, email: string, id: s
     }
 
     case "list": {
-      const todos = listTodos(email);
+      const todos = listTodos(userId);
       if (Array.isArray(todos)) {
         if (todos.length) {
-          console.log("TODOs\n");
           todos.map((todo) => {
             const utcDateString = (todo?.updated_at as string).replace(" ", "T") + "Z";
+            const isCreatedButNotEdited = isEqual(
+              todo?.created_at as string,
+              todo?.updated_at as string,
+            );
             console.log(
-              `ID: ${todo?.id}\n${todo?.status} | ${todo?.email} | Last modified: ${formatDistanceToNow(new Date(utcDateString), { addSuffix: true })}\n> ${todo?.text}\n`,
+              `ID: ${todo?.id}\n${todo?.status} | ${
+                isCreatedButNotEdited ? "Created" : "Edited"
+              } by: ${todo?.created_by_name} <${todo?.created_by_email}> | ${isCreatedButNotEdited ? "Created" : "Last modified"}: ${formatDistanceToNow(new Date(utcDateString), { addSuffix: true })}\n> ${todo?.text}\n`,
             );
           });
         } else {
@@ -49,11 +54,17 @@ export const executeTodoAction = async (action: TodoAction, email: string, id: s
     }
 
     case "read": {
-      const todo = readTodo(email, id);
+      const todo = readTodo(userId, id);
       if (todo?.id) {
         const utcDateString = (todo?.updated_at as string).replace(" ", "T") + "Z";
+        const isCreatedButNotEdited = isEqual(
+          todo?.created_at as string,
+          todo?.updated_at as string,
+        );
         console.log(
-          `ID: ${todo?.id}\n${todo?.status} | ${todo?.email} | Last modified: ${formatDistanceToNow(new Date(utcDateString), { addSuffix: true })}\n> ${todo?.text}\n`,
+          `ID: ${todo?.id}\n${todo?.status} | ${
+            isCreatedButNotEdited ? "Created" : "Edited"
+          } by: ${todo?.created_by_name} <${todo?.created_by_email}> | ${isCreatedButNotEdited ? "Created" : "Last modified"}: ${formatDistanceToNow(new Date(utcDateString), { addSuffix: true })}\n> ${todo?.text}\n`,
         );
       } else {
         console.error(
@@ -71,7 +82,7 @@ export const executeTodoAction = async (action: TodoAction, email: string, id: s
 
       const text: string = await rl.question("Enter updated todo: ");
       rl.close();
-      const updateTodoResponse = updateTodo(email, id, text);
+      const updateTodoResponse = updateTodo(userId, id, text);
       if (updateTodoResponse?.success) {
         console.log(
           `The Todo record with ID: ${id} has been updated successfully. View the updated record with \`swale todo read ${id}\``,
@@ -91,7 +102,7 @@ export const executeTodoAction = async (action: TodoAction, email: string, id: s
     }
 
     case "delete": {
-      const deleteTodoResponse = deleteTodo(email, id);
+      const deleteTodoResponse = deleteTodo(userId, id);
       if (deleteTodoResponse?.success) {
         console.log(
           `The Todo record with ID: ${id} has been deleted successfully. View all todos with \`swale todo list\``,

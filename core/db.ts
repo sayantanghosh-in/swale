@@ -9,6 +9,7 @@ db.exec(`
     name       TEXT NOT NULL,
     email      TEXT NOT NULL DEFAULT 0,
     phone      TEXT NOT NULL,
+    currency   TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   ) STRICT
@@ -18,10 +19,17 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS todos (
     id         TEXT PRIMARY KEY,
     text       TEXT NOT NULL,
-    email      TEXT NOT NULL,
     status     TEXT NOT NULL DEFAULT todo,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+
+    -- Foreign Key Constraint
+    CONSTRAINT fk_todos_users
+      FOREIGN KEY (created_by) 
+      REFERENCES users(id) 
+      ON DELETE CASCADE 
+      ON UPDATE CASCADE
   ) STRICT
 `);
 
@@ -32,7 +40,14 @@ db.exec(`
     amount      INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
-    created_by  TEXT NOT NULL
+    created_by TEXT NOT NULL,
+    
+    -- Foreign Key Constraint
+    CONSTRAINT fk_todos_users
+      FOREIGN KEY (created_by) 
+      REFERENCES users(id) 
+      ON DELETE CASCADE 
+      ON UPDATE CASCADE
   ) STRICT
 `);
 
@@ -42,6 +57,13 @@ db.exec(`
     text       TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    created_by TEXT NOT NULL
+    created_by TEXT NOT NULL,
+    
+    -- Foreign Key Constraint
+    CONSTRAINT fk_todos_users
+      FOREIGN KEY (created_by) 
+      REFERENCES users(id) 
+      ON DELETE CASCADE 
+      ON UPDATE CASCADE
   ) STRICT
 `);
