@@ -111,6 +111,44 @@ export const executeExpenseAction = async (
       break;
     }
 
+    case "filter": {
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+      let description = await rl.question("Enter description (part / full): ");
+      rl.close();
+      const expenses = listExpenses(createdBy, description);
+      if (Array.isArray(expenses)) {
+        if (expenses.length) {
+          expenses.map((expense) => {
+            const utcDateString = (expense?.updated_at as string).replace(" ", "T") + "Z";
+            const isCreatedButNotEdited = isEqual(
+              expense?.created_at as string,
+              expense?.updated_at as string,
+            );
+            const formattedAmount =
+              defaultCurrency === "Other"
+                ? `(Other) ${expense?.amount || 0}`
+                : new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: defaultCurrency,
+                  }).format((expense?.amount as number) || 0);
+            console.log(
+              `ID: ${expense?.id}\n${formattedAmount} | ${
+                isCreatedButNotEdited ? "Created" : "Edited"
+              } by: ${expense?.created_by_name} <${expense?.created_by_email}> | ${isCreatedButNotEdited ? "Created" : "Last modified"}: ${formatDistanceToNow(new Date(utcDateString), { addSuffix: true })}\n> ${expense?.description}\n`,
+            );
+          });
+        } else {
+          console.log("No Expense to display... add one using `swale expense add`");
+        }
+      } else {
+        console.error("ERROR_EXPENSES_COULD_NOT_BE_FETCHED");
+      }
+      break;
+    }
+
     case "update": {
       const selectedExpenseUpdateOption = (await select({
         message: "What do you want to update?",

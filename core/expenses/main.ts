@@ -40,11 +40,19 @@ export const addExpense = (expense: ExpenseRecord) => {
   };
 };
 
-export const listExpenses = (createdBy: string) => {
+export const listExpenses = (createdBy: string, description?: string) => {
   /**
    * Hard limiting to 5 records for now.
    * @TODO - implement a pagination later.
    */
+  if (description?.length) {
+    // return the expenses matching the description
+    return db
+      .prepare(
+        "SELECT expenses.id, expenses.description, expenses.amount, expenses.created_at, expenses.updated_at, users.email AS created_by_email, users.name AS created_by_name FROM expenses inner join users on expenses.created_by = users.id where expenses.created_by = ? AND expenses.description LIKE (?) ORDER BY expenses.updated_at DESC LIMIT 5",
+      )
+      .all(createdBy, `%${description}%`);
+  }
   return db
     .prepare(
       "SELECT expenses.id, expenses.description, expenses.amount, expenses.created_at, expenses.updated_at, users.email AS created_by_email, users.name AS created_by_name FROM expenses inner join users on expenses.created_by = users.id where expenses.created_by = ? ORDER BY expenses.updated_at DESC LIMIT 5",

@@ -101,7 +101,7 @@ program
 
 program
   .command("expense")
-  .argument("<action>", "add | delete | list | read | update")
+  .argument("<action>", "add | delete | filter | list | read | update")
   .argument("[expenseId]", "the uuid of the note item")
   .action(async (action: TodoAction, expenseId?: string) => {
     const firstUserResult = getFirstUser();

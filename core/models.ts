@@ -58,7 +58,7 @@ export const ExpenseSchema = z.object({
   createdBy: z.string(),
 });
 
-export const ExpenseActionSchema = z.literal(["add", "delete", "read", "list", "update"]);
+export const ExpenseActionSchema = z.literal(["add", "delete", "filter", "read", "list", "update"]);
 
 export type ExpenseRecord = z.infer<typeof ExpenseSchema>;
 export type ExpenseAction = z.infer<typeof ExpenseActionSchema>;
