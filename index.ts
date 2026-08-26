@@ -76,10 +76,11 @@ program
 program
   .command("todo")
   .argument("<action>", "add | delete | list | read | update")
-  .action(async (action: TodoAction) => {
+  .argument("[todoId]", "the uuid of the todo item")
+  .action(async (action: TodoAction, todoId?: string) => {
     const firstUserResult = getFirstUser();
     if (firstUserResult?.id) {
-      executeTodoAction(action, (firstUserResult as UserRecord).email);
+      executeTodoAction(action, (firstUserResult as UserRecord).email, todoId);
     } else {
       console.error("ERROR_NO_USER_FOUND");
     }

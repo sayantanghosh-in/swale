@@ -21,7 +21,7 @@ export const TodoSchema = z.object({
   id: z.uuid(),
   text: z.string(),
   email: z.email(),
-  done: z.number().min(0).max(1),
+  status: z.literal(["todo", "in_progress", "done"]),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

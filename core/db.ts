@@ -19,7 +19,7 @@ db.exec(`
     id         TEXT PRIMARY KEY,
     text       TEXT NOT NULL,
     email      TEXT NOT NULL,
-    done       INTEGER NOT NULL DEFAULT 0,
+    status     TEXT NOT NULL DEFAULT todo,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   ) STRICT
