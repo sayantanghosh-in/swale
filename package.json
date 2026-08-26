@@ -34,7 +34,7 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "swale": "./dist/index.js"
+    "swale": "dist/index.js"
   },
   "files": [
     "dist"
