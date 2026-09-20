@@ -14,13 +14,27 @@ export const UserSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   email: z.email(),
-  phone: z.string(),
-  currency: z.literal(["INR", "USD", "EUR", "GBP", "Other"]),
+  phone: z.string().optional(),
+  currency: z.literal(["INR", "USD", "EUR", "GBP", "Other"]).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
 
 export type UserRecord = z.infer<typeof UserSchema>;
+
+export const ConnectionsSchema = z.object({
+  id: z.uuid(),
+  provider: z.literal(["github", "leetcode"]),
+  login: z.string(),
+  name: z.string(),
+  avatarUrl: z.string(),
+  profileUrl: z.string(),
+  connectedAt: z.date(),
+  lastSyncedAt: z.date(),
+  linkedTo: z.string(),
+});
+
+export type ConnectionsRecord = z.infer<typeof ConnectionsSchema>;
 
 export const TodoSchema = z.object({
   id: z.uuid(),

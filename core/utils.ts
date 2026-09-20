@@ -1,6 +1,10 @@
-import fs, { existsSync, readFileSync } from "node:fs";
+// library imports
+import type { OAuthAppAuthentication } from "@octokit/auth-oauth-device";
+// node imports
+import fs, { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+// local imports
 import type { PackageJsonContents } from "./models.js";
 
 /**
@@ -69,4 +73,18 @@ export function ensureDataDir(): string {
 
 export function databasePath(): string {
   return path.join(ensureDataDir(), "data.db");
+}
+
+export function configPath(): string {
+  return path.join(ensureDataDir(), "config.json");
+}
+
+export function readConfig(): string {
+  if (!existsSync(configPath())) return "ERROR_CONFIG_NOT_SET";
+  const data = readFileSync(configPath(), "utf-8");
+  return data;
+}
+
+export function createOrUpdateConfig(jsonData: OAuthAppAuthentication): void {
+  writeFileSync(configPath(), JSON.stringify(jsonData), { mode: 0o600 });
 }
