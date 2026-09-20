@@ -9,6 +9,7 @@ export const migrationFunction = (db: DatabaseSync): void => {
         email      TEXT,
         phone      TEXT,
         currency   TEXT,
+        active     TEXT DEFAULT 'false',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
     ) STRICT
@@ -33,6 +34,7 @@ export const migrationFunction = (db: DatabaseSync): void => {
             profile_url     TEXT,
             connected_at    TEXT NOT NULL,
             last_synced_at  TEXT,
+            meta            TEXT,
             linked_to       TEXT NOT NULL,
 
             -- one connection per provider per user

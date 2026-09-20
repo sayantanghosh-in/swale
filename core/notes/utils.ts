@@ -34,7 +34,7 @@ export const executeNoteAction = async (action: NoteAction, createdBy: string, i
         if (notes.length) {
           console.log("Notes\n");
           notes.map((note) => {
-            const utcDateString = (note?.updated_at as string).replace(" ", "T") + "Z";
+            const utcDateString = note?.updated_at as string;
             const isCreatedButNotEdited = isEqual(
               note?.created_at as string,
               note?.updated_at as string,
@@ -57,7 +57,7 @@ export const executeNoteAction = async (action: NoteAction, createdBy: string, i
     case "read": {
       const note = readNote(createdBy, id);
       if (note?.id) {
-        const utcDateString = (note?.updated_at as string).replace(" ", "T") + "Z";
+        const utcDateString = note?.updated_at as string;
         const isCreatedButNotEdited = isEqual(
           note?.created_at as string,
           note?.updated_at as string,

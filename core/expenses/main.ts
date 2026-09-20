@@ -26,12 +26,14 @@ export const createExpenseObject = (
 export const addExpense = (expense: ExpenseRecord) => {
   // add the expense to the 'expenses' table
   const preparedInsert = db.prepare(
-    "INSERT INTO expenses (id, description, amount, created_at, updated_at, created_by) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)",
+    "INSERT INTO expenses (id, description, amount, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?, ?)",
   );
   const ranInsertStatement = preparedInsert.run(
     expense.id,
     expense.description,
     expense.amount,
+    expense.createdAt.toISOString(),
+    expense.updatedAt.toISOString(),
     expense.createdBy,
   );
   return {
@@ -89,11 +91,12 @@ export const updateExpense = (
   }
 
   const preparedUpdate = db.prepare(
-    "UPDATE expenses SET description = ?, amount = ?, updated_at = CURRENT_TIMESTAMP where created_by = ? and id = ?",
+    "UPDATE expenses SET description = ?, amount = ?, updated_at = ? where created_by = ? and id = ?",
   );
   const ranPreparedUpdate = preparedUpdate.run(
     description === null ? matchingExpense?.description : description,
     amount === null ? matchingExpense?.amount : amount,
+    new Date().toISOString(),
     createdBy,
     id,
   );

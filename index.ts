@@ -1,37 +1,14 @@
 #!/usr/bin/env node
 import { program } from "commander";
-import readline from "readline/promises";
 import { select } from "@inquirer/prompts";
-import { SWALE_GITHUB_ISSES_LINK } from "./core/constants.js";
 import { executeExpenseAction } from "./core/expenses/utils.js";
 import { type SupportedCurrencies, type TodoAction, type UserRecord } from "./core/models.js";
 import { executeNoteAction } from "./core/notes/utils.js";
 import { executeTodoAction } from "./core/todos/utils.js";
-import { createUserObject, getFirstUser, insertUser } from "./core/users/main.js";
-import { createOrUpdateConfig, parsePackageJsonContents, readConfig } from "./core/utils.js";
+import { deactivateAllUsers, getActiveUser } from "./core/users/main.js";
+import { parsePackageJsonContents } from "./core/utils.js";
 // library imports
-import { createOAuthDeviceAuth } from "@octokit/auth-oauth-device";
-import { getOctokit } from "./core/octokit.js";
-import { createConnectionsObject, insertConnection } from "./core/connections/main.js";
-
-const auth = createOAuthDeviceAuth({
-  clientType: "oauth-app",
-  clientId: "Ov23liJbUgcPQV2hYKX0",
-  scopes: ["read:user", "user:email"],
-  onVerification(verification) {
-    // verification example
-    // {
-    //   device_code: "3584d83530557fdd1f46af8289938c8ef79f9dc5",
-    //   user_code: "WDJB-MJHT",
-    //   verification_uri: "https://github.com/login/device",
-    //   expires_in: 900,
-    //   interval: 5,
-    // };
-
-    console.log("Open %s", verification.verification_uri);
-    console.log("Enter code: %s", verification.user_code);
-  },
-});
+import { getLeetcodeProfileDetails, onboarding } from "./core/services.js";
 
 const packageJsonContents = parsePackageJsonContents();
 
@@ -40,97 +17,18 @@ program
   .name(packageJsonContents?.name)
   .description(packageJsonContents?.description)
   .version(packageJsonContents?.version)
-  .hook("preSubcommand", async () => {
-    const configData = readConfig();
-    if (configData === "ERROR_CONFIG_NOT_SET" || !JSON.parse(configData as string)?.token) {
-      // ask user to login to their github account
-      const tokenAuthentication = await auth({
-        type: "oauth",
-      });
-      // resolves with
-      // {
-      //   type: "token",
-      //   tokenType: "oauth",
-      //   clientType: "oauth-app",
-      //   clientId: "1234567890abcdef1234",
-      //   token: "...", /* the created oauth token */
-      //   scopes: [] /* depend on request scopes by OAuth app */
-      // }
-      createOrUpdateConfig(tokenAuthentication);
-
-      // get the Octokit instance
-      const oc = getOctokit({ auth: tokenAuthentication?.token });
-      if (!oc) {
-        console.error("ERROR_UNKNOWN_AUTH_ERROR");
-        return;
-      }
-      // get the user details and set it to the users table
-      const res = await oc.request("/user", {
-        headers: {
-          "X-GitHub-Api-Version": "2026-03-10",
-        },
-      });
-
-      // create the user
-      const name = res?.data?.name || res?.data?.login; // if name is private, use the username
-      const email = res?.data?.email;
-      const createUserObjectResult = createUserObject(name, email);
-
-      if (createUserObjectResult.success && !!createUserObjectResult?.userObj?.id) {
-        const insertUserResult = insertUser(createUserObjectResult.userObj);
-        if (insertUserResult.success) {
-          // create the connection record and link the user to that connection
-          const login = res?.data?.login;
-          const avatarUrl = res?.data?.avatar_url;
-          const profileUrl = res?.data?.html_url;
-          const linkedTo = createUserObjectResult?.userObj?.id;
-          const createConnectionsObjectResult = createConnectionsObject(
-            "github",
-            login,
-            name,
-            avatarUrl,
-            profileUrl,
-            linkedTo,
-          );
-          if (
-            createConnectionsObjectResult?.success &&
-            createConnectionsObjectResult?.connectionsObj?.id
-          ) {
-            const insertConnectionsResult = insertConnection(
-              createConnectionsObjectResult?.connectionsObj,
-            );
-            if (insertConnectionsResult?.success) {
-              console.log(
-                `${createUserObjectResult.userObj.name}, you have been added successfully...`,
-              );
-            }
-          }
-        } else {
-          console.error(
-            `We had a issue on our end. Please report the issue here: ${SWALE_GITHUB_ISSES_LINK}`,
-          );
-          process.exit(1);
-        }
-      } else {
-        console.error(
-          "The user could not be created... Please ensure all the entered fields are valid.",
-        );
-      }
-    } else {
-      // user configuration already present, let them use swale...
-      return;
-    }
-  });
+  .hook("preSubcommand", onboarding);
 
 // Registering all the commands
+// Module commands
 program
   .command("todo")
   .argument("<action>", "add | delete | list | read | update")
   .argument("[todoId]", "the uuid of the todo item")
   .action(async (action: TodoAction, todoId?: string) => {
-    const firstUserResult = getFirstUser();
-    if (firstUserResult?.id) {
-      executeTodoAction(action, (firstUserResult as UserRecord).id, todoId);
+    const activeUser = getActiveUser();
+    if (activeUser?.id) {
+      executeTodoAction(action, (activeUser as UserRecord).id, todoId);
     } else {
       console.error("ERROR_NO_USER_FOUND");
     }
@@ -141,10 +39,10 @@ program
   .argument("<action>", "add | delete | filter | list | read | update")
   .argument("[expenseId]", "the uuid of the note item")
   .action(async (action: TodoAction, expenseId?: string) => {
-    const firstUserResult = getFirstUser();
-    if (firstUserResult?.id) {
+    const activeUser = getActiveUser();
+    if (activeUser?.id) {
       let currency = null;
-      if (!firstUserResult?.currency) {
+      if (!activeUser?.currency) {
         currency = (await select({
           message: "Select a currency:",
           choices: ["INR", "USD", "EUR", "GBP", "Other"].map((currency) => {
@@ -155,9 +53,9 @@ program
           }),
         })) as SupportedCurrencies;
       } else {
-        currency = firstUserResult?.currency as SupportedCurrencies;
+        currency = activeUser?.currency as SupportedCurrencies;
       }
-      executeExpenseAction(action, (firstUserResult as UserRecord).id, currency, expenseId);
+      executeExpenseAction(action, (activeUser as UserRecord).id, currency, expenseId);
     } else {
       console.error("ERROR_NO_USER_FOUND");
     }
@@ -168,11 +66,40 @@ program
   .argument("<action>", "add | delete | list | read | update")
   .argument("[noteId]", "the uuid of the note item")
   .action(async (action: TodoAction, noteId?: string) => {
-    const firstUserResult = getFirstUser();
-    if (firstUserResult?.id) {
-      executeNoteAction(action, (firstUserResult as UserRecord).id, noteId);
+    const activeUser = getActiveUser();
+    if (activeUser?.id) {
+      executeNoteAction(action, (activeUser as UserRecord).id, noteId);
     } else {
       console.error("ERROR_NO_USER_FOUND");
+    }
+  });
+
+// Utility commands
+
+// Show leetcode profile stats
+// @TODO - manage presentation of the data
+program
+  .command("leetcode")
+  .alias("lc")
+  .argument("[username]", "the username of the leetcode account to be searched")
+  .action(async (username?: string) => {
+    if (typeof username === "string" && username?.trim()?.length > 0) {
+      console.log(await getLeetcodeProfileDetails(username));
+    } else {
+      // search for an existing leetcode connection for the loggedin user
+    }
+  });
+
+// Make all users inactive
+program
+  .command("logout")
+  .alias("signout")
+  .action(async () => {
+    const deactivatAlleUsersResponse = deactivateAllUsers();
+    if (deactivatAlleUsersResponse?.success) {
+      console.log("Logged out successfully...");
+    } else {
+      console.error(deactivatAlleUsersResponse?.error);
     }
   });
 

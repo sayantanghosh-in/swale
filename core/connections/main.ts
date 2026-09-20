@@ -9,6 +9,7 @@ export const createConnectionsObject = (
   avatarUrl: string,
   profileUrl: string,
   linkedTo: string,
+  meta?: any,
 ): { success: boolean; connectionsObj: ConnectionsRecord } => {
   const currentDate = new Date();
   const connectionsObj: ConnectionsRecord = {
@@ -21,6 +22,7 @@ export const createConnectionsObject = (
     connectedAt: currentDate,
     lastSyncedAt: currentDate,
     linkedTo,
+    meta,
   };
   const parseResult = ConnectionsSchema.safeParse(connectionsObj);
 
@@ -31,19 +33,28 @@ export const createConnectionsObject = (
 };
 
 export const insertConnection = (connectionsObj: ConnectionsRecord): { success: boolean } => {
-  // insert the user to the 'connections' table
-  const preparedInsert = db.prepare(
-    "INSERT INTO connections (id, provider, login, name, avatar_url, profile_url, connected_at, last_synced_at, linked_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-  );
+  const preparedInsert = db.prepare(`
+    INSERT INTO connections
+      (id, provider, login, name, avatar_url, profile_url, connected_at, last_synced_at, meta, linked_to)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(linked_to, provider) DO UPDATE SET
+      login          = excluded.login,
+      name           = excluded.name,
+      avatar_url     = excluded.avatar_url,
+      profile_url    = excluded.profile_url,
+      last_synced_at = excluded.last_synced_at,
+      meta           = excluded.meta
+  `);
   const ranInsertStatement = preparedInsert.run(
     connectionsObj?.id,
-    connectionsObj?.name,
+    connectionsObj?.provider,
     connectionsObj?.login,
     connectionsObj?.name,
     connectionsObj?.avatarUrl,
     connectionsObj?.profileUrl,
-    connectionsObj?.connectedAt.toString(),
-    connectionsObj?.lastSyncedAt.toString(),
+    connectionsObj?.connectedAt.toISOString(),
+    connectionsObj?.lastSyncedAt.toISOString(),
+    JSON.stringify(connectionsObj?.meta ?? {}),
     connectionsObj?.linkedTo,
   );
   return {

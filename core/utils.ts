@@ -1,7 +1,7 @@
 // library imports
 import type { OAuthAppAuthentication } from "@octokit/auth-oauth-device";
 // node imports
-import fs, { existsSync, readFileSync, writeFileSync } from "node:fs";
+import fs, { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 // local imports
@@ -79,12 +79,53 @@ export function configPath(): string {
   return path.join(ensureDataDir(), "config.json");
 }
 
-export function readConfig(): string {
-  if (!existsSync(configPath())) return "ERROR_CONFIG_NOT_SET";
-  const data = readFileSync(configPath(), "utf-8");
-  return data;
+export type SwaleConfig = Record<string, unknown>;
+
+/**
+ * Reads config.json. A missing or unreadable file is not an error — it simply
+ * means nothing has been configured yet, so an empty object is returned.
+ */
+export function readConfig(): SwaleConfig {
+  try {
+    if (!existsSync(configPath())) return {};
+    const data = readFileSync(configPath(), "utf-8");
+    if (data.trim().length === 0) return {};
+    const parsed = JSON.parse(data);
+    return parsed !== null && typeof parsed === "object" ? (parsed as SwaleConfig) : {};
+  } catch {
+    // A corrupted file is treated as absent rather than crashing the CLI.
+    return {};
+  }
 }
 
-export function createOrUpdateConfig(jsonData: OAuthAppAuthentication): void {
-  writeFileSync(configPath(), JSON.stringify(jsonData), { mode: 0o600 });
+function writeConfig(config: SwaleConfig): void {
+  const file = configPath();
+  // mode only applies when the file is created, so enforce it afterwards too.
+  writeFileSync(file, JSON.stringify(config, null, 2), { mode: 0o600 });
+  try {
+    chmodSync(file, 0o600);
+  } catch {
+    // Windows and some filesystems do not support this; the parent dir is 0700.
+  }
+}
+
+/**
+ * Shallow-merges `patch` into the existing config. Top level keys namespace each
+ * concern ("github", "llm", ...) so writing one never clobbers another.
+ */
+export function createOrUpdateConfig(patch: SwaleConfig): void {
+  writeConfig({ ...readConfig(), ...patch });
+}
+
+/** Removes a single top level key, leaving the rest of the file intact. */
+export function removeConfigKey(key: string): void {
+  const config = readConfig();
+  if (!(key in config)) return;
+  delete config[key];
+  writeConfig(config);
+}
+
+export function getGithubAuth(): OAuthAppAuthentication | undefined {
+  const github = readConfig()["github"];
+  return github && typeof github === "object" ? (github as OAuthAppAuthentication) : undefined;
 }

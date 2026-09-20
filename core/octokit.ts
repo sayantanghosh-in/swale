@@ -1,5 +1,4 @@
 import { Octokit } from "octokit";
-import {} from "octokit";
 
 type OctokitOptions = ConstructorParameters<typeof Octokit>[0];
 

@@ -33,7 +33,7 @@ export const executeTodoAction = async (action: TodoAction, createdBy: string, i
       if (Array.isArray(todos)) {
         if (todos.length) {
           todos.map((todo) => {
-            const utcDateString = (todo?.updated_at as string).replace(" ", "T") + "Z";
+            const utcDateString = todo?.updated_at as string;
             const isCreatedButNotEdited = isEqual(
               todo?.created_at as string,
               todo?.updated_at as string,
@@ -56,7 +56,7 @@ export const executeTodoAction = async (action: TodoAction, createdBy: string, i
     case "read": {
       const todo = readTodo(createdBy, id);
       if (todo?.id) {
-        const utcDateString = (todo?.updated_at as string).replace(" ", "T") + "Z";
+        const utcDateString = todo?.updated_at as string;
         const isCreatedButNotEdited = isEqual(
           todo?.created_at as string,
           todo?.updated_at as string,

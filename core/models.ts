@@ -13,9 +13,10 @@ export type SupportedExpenseUpdateOptions = "Amount" | "Description" | "Both";
 export const UserSchema = z.object({
   id: z.uuid(),
   name: z.string(),
-  email: z.email(),
+  email: z.email().optional(),
   phone: z.string().optional(),
   currency: z.literal(["INR", "USD", "EUR", "GBP", "Other"]).optional(),
+  active: z.boolean(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -31,6 +32,7 @@ export const ConnectionsSchema = z.object({
   profileUrl: z.string(),
   connectedAt: z.date(),
   lastSyncedAt: z.date(),
+  meta: z.object().optional(),
   linkedTo: z.string(),
 });
 
@@ -76,3 +78,10 @@ export const ExpenseActionSchema = z.literal(["add", "delete", "filter", "read",
 
 export type ExpenseRecord = z.infer<typeof ExpenseSchema>;
 export type ExpenseAction = z.infer<typeof ExpenseActionSchema>;
+
+export type LeetcodeBasicDetailsMeta = {
+  ranking: number;
+  skills: string[];
+  name: string;
+  avatar: string;
+};
