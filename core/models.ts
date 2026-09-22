@@ -1,3 +1,4 @@
+import type { OctokitResponse } from "@octokit/types";
 import { z } from "zod";
 
 export type PackageJsonContents = {
@@ -84,4 +85,14 @@ export type LeetcodeBasicDetailsMeta = {
   skills: string[];
   name: string;
   avatar: string;
+};
+
+export type GithubUserProfileDetails = {
+  name: string;
+  email: string;
+  res: OctokitResponse<any, number>;
+};
+
+export type GithubRepositoryDetails = {
+  res: OctokitResponse<any, number>;
 };

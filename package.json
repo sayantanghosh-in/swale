@@ -54,6 +54,7 @@
     "@inquirer/prompts": "^8.6.0",
     "@octokit/auth-oauth-device": "^8.0.5",
     "ai": "^7.0.65",
+    "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
@@ -62,6 +63,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@octokit/types": "^18.0.0",
     "@types/node": "^26.2.0",
     "prettier": "^3.9.6",
     "tsx": "^4.23.12",

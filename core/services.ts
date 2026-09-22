@@ -13,8 +13,12 @@ import {
 import { createUserObject, insertUser, listAllUsers, loginUser } from "./users/main.js";
 import { createOrUpdateConfig, getGithubAuth } from "./utils.js";
 import type { LeetcodeBasicDetailsMeta } from "./models.js";
-import { getOctokit } from "./octokit.js";
-import { createConnectionsObject, insertConnection } from "./connections/main.js";
+import { getGithubUserProfileDetails, getOctokit } from "./octokit.js";
+import {
+  createConnectionsObject,
+  insertConnection,
+  validateGithubLoginWithExistingConnection,
+} from "./connections/main.js";
 
 export async function getLeetcodeBasicDetails(username: string): Promise<LeetcodeBasicDetailsMeta> {
   const response = await fetch(LEETCODE_ALFA_URL + "/" + username, {
@@ -44,21 +48,17 @@ const auth = createOAuthDeviceAuth({
   clientId: process.env.SWALE_GITHUB_CLIENT_ID || "Ov23liJbUgcPQV2hYKX0",
   scopes: ["read:user", "user:email"],
   onVerification(verification) {
-    // verification example
-    // {
-    //   device_code: "3584d83530557fdd1f46af8289938c8ef79f9dc5",
-    //   user_code: "WDJB-MJHT",
-    //   verification_uri: "https://github.com/login/device",
-    //   expires_in: 900,
-    //   interval: 5,
-    // };
-
     console.log("Open %s", verification.verification_uri);
     console.log("Enter code: %s", verification.user_code);
   },
 });
 
 export async function onboarding() {
+  if (!process.stdin.isTTY) {
+    console.error("Swale needs an interactive terminal to function.");
+    process.exit(1);
+  }
+
   // @TODO - refactor this function
   const existingAuth = getGithubAuth();
   if (!existingAuth?.token) {
@@ -72,7 +72,7 @@ export async function onboarding() {
         message: "Log in as?",
         choices: allUsers?.map((u) => {
           return {
-            name: `${u?.name ?? "<No Name>"}${(u?.email as string)?.trim()?.length ? "<" + u?.email + ">" : ""}`,
+            name: `${u?.name ?? "<No Name>"} ${(u?.email as string)?.trim()?.length ? "<" + u?.email + ">" : ""}`,
             value: u?.id,
           };
         }),
@@ -85,12 +85,30 @@ export async function onboarding() {
           const tokenAuthentication = await auth({
             type: "oauth",
           });
-          createOrUpdateConfig({ github: tokenAuthentication });
           // create the Octokit instance
           const oc = getOctokit({ auth: tokenAuthentication?.token });
           if (!oc) {
             console.error("ERROR_UNKNOWN_AUTH_ERROR");
             return;
+          } else {
+            // check if the logged in github user is the same one associated to the user in the database
+            // compare the login column's value with the returned github login value
+            const profileDetails = await getGithubUserProfileDetails();
+            if (!profileDetails) {
+              console.error("ERROR_FETCHING_GITHUB_PROFILE_INFORMATION");
+              process.exit(1);
+            }
+            const { res } = profileDetails;
+            const isUserValid = validateGithubLoginWithExistingConnection(
+              selectedUser,
+              res?.data?.login,
+            );
+            if (isUserValid) {
+              // update the configuration file's github object
+              createOrUpdateConfig({ github: tokenAuthentication });
+            } else {
+              console.error("ERROR_LOGGED_IN_GITHUB_USER_DOES_NOT_MATCH_WITH_SELECTED_USER");
+            }
           }
           return;
         } else {
@@ -98,16 +116,6 @@ export async function onboarding() {
           process.exit(1);
         }
       }
-    }
-
-    /**
-     * The device flow and the leetcode prompt both need a human at a keyboard.
-     * Without a TTY there is nobody to approve the code, so fail fast instead of
-     * hanging on a prompt nobody can see.
-     */
-    if (!process.stdin.isTTY) {
-      console.error("Swale needs an interactive terminal to connect your GitHub account.");
-      process.exit(1);
     }
 
     // ask user to login to their github account
@@ -122,16 +130,12 @@ export async function onboarding() {
       console.error("ERROR_UNKNOWN_AUTH_ERROR");
       return;
     }
-    // get the user details and set it to the users table
-    const res = await oc.request("/user", {
-      headers: {
-        "X-GitHub-Api-Version": "2026-03-10",
-      },
-    });
-
-    // create the user
-    const name = res?.data?.name || res?.data?.login; // if name is private, use the username
-    const email = res?.data?.email;
+    const profileDetails = await getGithubUserProfileDetails();
+    if (!profileDetails) {
+      console.error("ERROR_FETCHING_GITHUB_PROFILE_INFORMATION");
+      process.exit(1);
+    }
+    const { name, email, res } = profileDetails;
     const createUserObjectResult = createUserObject(name, email);
 
     if (createUserObjectResult.success && !!createUserObjectResult?.userObj?.id) {

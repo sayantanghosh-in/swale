@@ -61,3 +61,15 @@ export const insertConnection = (connectionsObj: ConnectionsRecord): { success: 
     success: ranInsertStatement?.changes === 1,
   };
 };
+
+export const validateGithubLoginWithExistingConnection = (
+  userId: string,
+  githubLogin: string,
+): { success: boolean } => {
+  const matchingConnection = db
+    .prepare("SELECT * FROM connections where linked_to = ? AND login = ? AND provider = 'github'")
+    .get(userId, githubLogin);
+  return {
+    success: typeof matchingConnection?.id === "string" && matchingConnection?.id?.length > 0,
+  };
+};

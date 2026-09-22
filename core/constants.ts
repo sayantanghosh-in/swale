@@ -6,3 +6,7 @@ export const LEETCODE_ALFA_URL = "https://alfa-leetcode-api.onrender.com";
 export const LEETCODE_API_ROUTES = {
   profile: "/profile",
 };
+
+export const COLORS = {
+  ORANGE: "#F97D09",
+};

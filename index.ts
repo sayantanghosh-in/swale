@@ -2,6 +2,7 @@
 import { program } from "commander";
 import { select } from "@inquirer/prompts";
 import { executeExpenseAction } from "./core/expenses/utils.js";
+import { formatLastRepositories } from "./core/formatters.js";
 import { type SupportedCurrencies, type TodoAction, type UserRecord } from "./core/models.js";
 import { executeNoteAction } from "./core/notes/utils.js";
 import { executeTodoAction } from "./core/todos/utils.js";
@@ -9,6 +10,7 @@ import { deactivateAllUsers, getActiveUser } from "./core/users/main.js";
 import { parsePackageJsonContents } from "./core/utils.js";
 // library imports
 import { getLeetcodeProfileDetails, onboarding } from "./core/services.js";
+import { listRepositories } from "./core/octokit.js";
 
 const packageJsonContents = parsePackageJsonContents();
 
@@ -71,6 +73,22 @@ program
       executeNoteAction(action, (activeUser as UserRecord).id, noteId);
     } else {
       console.error("ERROR_NO_USER_FOUND");
+    }
+  });
+
+program
+  .command("github")
+  .alias("gh")
+  .argument("<action>", "sync")
+  .action(async (action: "sync") => {
+    if (action === "sync") {
+      const profileDetils = await listRepositories();
+      if (!profileDetils) {
+        console.error("ERROR_GITHUB_SYNC");
+        process.exit(1);
+      }
+      const { res } = profileDetils;
+      console.log(formatLastRepositories(res?.data));
     }
   });
 
