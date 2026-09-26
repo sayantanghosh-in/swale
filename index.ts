@@ -2,8 +2,13 @@
 import { program } from "commander";
 import { select } from "@inquirer/prompts";
 import { executeExpenseAction } from "./core/expenses/utils.js";
-import { formatLastRepositories } from "./core/formatters.js";
-import { type SupportedCurrencies, type TodoAction, type UserRecord } from "./core/models.js";
+import { formatLastRepositories, formatLeetcodeContributions } from "./core/formatters.js";
+import {
+  type LeetcodeProfileDetails,
+  type SupportedCurrencies,
+  type TodoAction,
+  type UserRecord,
+} from "./core/models.js";
 import { executeNoteAction } from "./core/notes/utils.js";
 import { executeTodoAction } from "./core/todos/utils.js";
 import { deactivateAllUsers, getActiveUser } from "./core/users/main.js";
@@ -11,6 +16,7 @@ import { parsePackageJsonContents } from "./core/utils.js";
 // library imports
 import { getLeetcodeProfileDetails, onboarding } from "./core/services.js";
 import { listRepositories } from "./core/octokit.js";
+import { fetchLeetcodeLoginByProvider } from "./core/connections/main.js";
 
 const packageJsonContents = parsePackageJsonContents();
 
@@ -102,9 +108,23 @@ program
   .argument("[username]", "the username of the leetcode account to be searched")
   .action(async (username?: string) => {
     if (typeof username === "string" && username?.trim()?.length > 0) {
-      console.log(await getLeetcodeProfileDetails(username));
+      const leetcodeData: LeetcodeProfileDetails = await getLeetcodeProfileDetails(username);
+      console.log(formatLeetcodeContributions(leetcodeData, username));
     } else {
       // search for an existing leetcode connection for the loggedin user
+      const activeUser = getActiveUser();
+      if (activeUser?.id) {
+        const leetcodeConnectionResponse = fetchLeetcodeLoginByProvider(activeUser?.id, "leetcode");
+        if (!leetcodeConnectionResponse?.success) {
+          console.error("ERROR_LEETCODE_CONNECTION");
+        } else {
+          const username = leetcodeConnectionResponse?.login;
+          const leetcodeData: LeetcodeProfileDetails = await getLeetcodeProfileDetails(username);
+          console.log(formatLeetcodeContributions(leetcodeData, username));
+        }
+      } else {
+        console.error("ERROR_NO_USER_FOUND");
+      }
     }
   });
 

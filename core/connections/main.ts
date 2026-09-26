@@ -73,3 +73,16 @@ export const validateGithubLoginWithExistingConnection = (
     success: typeof matchingConnection?.id === "string" && matchingConnection?.id?.length > 0,
   };
 };
+
+export const fetchLeetcodeLoginByProvider = (
+  userId: string,
+  provider: ConnectionsRecord["provider"],
+): { success: boolean; login: string } => {
+  const matchingConnection = db
+    .prepare("SELECT id, login FROM connections where linked_to = ? AND provider = ?")
+    .get(userId, provider);
+  return {
+    success: typeof matchingConnection?.id === "string" && matchingConnection?.id?.length > 0,
+    login: matchingConnection?.login as string,
+  };
+};

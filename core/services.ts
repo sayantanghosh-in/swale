@@ -5,14 +5,13 @@ import { select } from "@inquirer/prompts";
 import readline from "readline/promises";
 // local imports
 import {
-  LEETCODE_ALFA_URL,
-  LEETCODE_API_ROUTES,
+  LEETCODE_GRAPHQL_URL,
   LEETCODE_PROFILE_URL,
   SWALE_GITHUB_ISSES_LINK,
 } from "./constants.js";
 import { createUserObject, insertUser, listAllUsers, loginUser } from "./users/main.js";
 import { createOrUpdateConfig, getGithubAuth } from "./utils.js";
-import type { LeetcodeBasicDetailsMeta } from "./models.js";
+import type { LeetcodeBasicDetailsMeta, LeetcodeProfileDetails } from "./models.js";
 import { getGithubUserProfileDetails, getOctokit } from "./octokit.js";
 import {
   createConnectionsObject,
@@ -20,27 +19,167 @@ import {
   validateGithubLoginWithExistingConnection,
 } from "./connections/main.js";
 
-export async function getLeetcodeBasicDetails(username: string): Promise<LeetcodeBasicDetailsMeta> {
-  const response = await fetch(LEETCODE_ALFA_URL + "/" + username, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
+async function queryLeetCode<T = any>(
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<T> {
+  const response = await fetch(LEETCODE_GRAPHQL_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Referer: "https://leetcode.com",
+      Origin: "https://leetcode.com",
+    },
+    body: JSON.stringify({ query, variables }),
   });
 
-  const data = await response.json();
-  return data as LeetcodeBasicDetailsMeta;
+  if (!response.ok) {
+    throw new Error(`LeetCode API error: ${response.status} ${response.statusText}`);
+  }
+
+  const json = (await response.json()) as { data: T; errors?: unknown };
+
+  if (json.errors) {
+    throw new Error(`LeetCode GraphQL error: ${JSON.stringify(json.errors)}`);
+  }
+
+  return json.data;
 }
 
-export async function getLeetcodeProfileDetails(username: string) {
-  const response = await fetch(
-    LEETCODE_ALFA_URL + "/" + username + LEETCODE_API_ROUTES["profile"],
-    {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    },
+export async function getLeetcodeBasicDetails(username: string): Promise<LeetcodeBasicDetailsMeta> {
+  const query = `
+    query getBasicDetails($username: String!) {
+      matchedUser(username: $username) {
+        username
+        profile {
+          ranking
+          realName
+          userAvatar
+        }
+      }
+      skillStats(username: $username) {
+        fundamentalSkills { tagName }
+        intermediateSkills { tagName }
+        advancedSkills { tagName }
+      }
+    }
+  `;
+
+  const data = await queryLeetCode<{
+    matchedUser: {
+      username: string;
+      profile: { ranking: number; realName: string; userAvatar: string };
+    };
+    skillStats: {
+      fundamentalSkills: { tagName: string }[];
+      intermediateSkills: { tagName: string }[];
+      advancedSkills: { tagName: string }[];
+    };
+  }>(query, { username });
+
+  const skills = [
+    ...data.skillStats.fundamentalSkills,
+    ...data.skillStats.intermediateSkills,
+    ...data.skillStats.advancedSkills,
+  ].map((s) => s.tagName);
+
+  return {
+    ranking: data.matchedUser.profile.ranking,
+    skills,
+    name: data.matchedUser.profile.realName || data.matchedUser.username,
+    avatar: data.matchedUser.profile.userAvatar,
+  };
+}
+
+export async function getLeetcodeProfileDetails(username: string): Promise<LeetcodeProfileDetails> {
+  const query = `
+    query getProfileDetails($username: String!) {
+      matchedUser(username: $username) {
+        profile {
+          ranking
+        }
+        submitStats: submitStatsGlobal {
+          acSubmissionNum {
+            difficulty
+            count
+            submissions
+          }
+          totalSubmissionNum {
+            difficulty
+            count
+            submissions
+          }
+        }
+        userCalendar {
+          submissionCalendar
+        }
+      }
+      allQuestionsCount {
+        difficulty
+        count
+      }
+      recentSubmissionList(username: $username, limit: 20) {
+        title
+        titleSlug
+        timestamp
+        statusDisplay
+        lang
+      }
+    }
+  `;
+
+  const data = await queryLeetCode<{
+    matchedUser: {
+      profile: { ranking: number };
+      submitStats: {
+        acSubmissionNum: { difficulty: string; count: number; submissions: number }[];
+        totalSubmissionNum: { difficulty: string; count: number; submissions: number }[];
+      };
+      userCalendar: { submissionCalendar: string };
+    };
+    allQuestionsCount: { difficulty: string; count: number }[];
+    recentSubmissionList: {
+      title: string;
+      titleSlug: string;
+      timestamp: string;
+      statusDisplay: string;
+      lang: string;
+    }[];
+  }>(query, { username });
+
+  const totalSolved =
+    data.matchedUser.submitStats.acSubmissionNum.find((d) => d.difficulty === "All")?.count ?? 0;
+
+  const totalQuestions = data.allQuestionsCount.find((d) => d.difficulty === "All")?.count ?? 0;
+
+  const totalSubmissions = data.matchedUser.submitStats.acSubmissionNum.map((d) => ({
+    difficulty: d.difficulty as "All" | "Easy" | "Medium" | "Hard",
+    count: d.count,
+    submissions: d.submissions,
+  }));
+
+  const submissionCalendar: { [key: string]: number } = JSON.parse(
+    data.matchedUser.userCalendar.submissionCalendar || "{}",
   );
 
-  const data = await response.json();
-  return data;
+  const recentSubmissions = data.recentSubmissionList.map((sub) => {
+    return {
+      title: sub?.title ?? "",
+      slug: sub?.titleSlug ?? "",
+      timestamp: sub?.timestamp ?? "",
+      statusDisplay: sub?.statusDisplay ?? "",
+      lang: sub?.lang ?? "",
+    };
+  });
+
+  return {
+    submissionCalendar,
+    ranking: data.matchedUser.profile.ranking,
+    totalSolved,
+    totalQuestions,
+    totalSubmissions,
+    recentSubmissions,
+  };
 }
 
 const auth = createOAuthDeviceAuth({

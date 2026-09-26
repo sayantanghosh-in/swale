@@ -80,13 +80,6 @@ export const ExpenseActionSchema = z.literal(["add", "delete", "filter", "read",
 export type ExpenseRecord = z.infer<typeof ExpenseSchema>;
 export type ExpenseAction = z.infer<typeof ExpenseActionSchema>;
 
-export type LeetcodeBasicDetailsMeta = {
-  ranking: number;
-  skills: string[];
-  name: string;
-  avatar: string;
-};
-
 export type GithubUserProfileDetails = {
   name: string;
   email: string;
@@ -95,4 +88,32 @@ export type GithubUserProfileDetails = {
 
 export type GithubRepositoryDetails = {
   res: OctokitResponse<any, number>;
+};
+
+export type LeetcodeBasicDetailsMeta = {
+  ranking: number;
+  skills: string[];
+  name: string;
+  avatar: string;
+};
+
+export type LeetcodeProfileDetails = {
+  submissionCalendar: {
+    [key: string]: number;
+  };
+  ranking: number;
+  totalSolved: number;
+  totalQuestions: number;
+  totalSubmissions: {
+    difficulty: "All" | "Easy" | "Medium" | "Hard";
+    count: number;
+    submissions: number;
+  }[];
+  recentSubmissions: {
+    title: string;
+    slug: string;
+    timestamp: string; // stringified timestamp "17000121212"
+    statusDisplay: string;
+    lang: string;
+  }[];
 };
