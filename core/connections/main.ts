@@ -74,7 +74,8 @@ export const validateGithubLoginWithExistingConnection = (
   };
 };
 
-export const fetchLeetcodeLoginByProvider = (
+/** Looks up the stored login for any provider, github included. */
+export const fetchLoginByProvider = (
   userId: string,
   provider: ConnectionsRecord["provider"],
 ): { success: boolean; login: string } => {

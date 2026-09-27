@@ -1,6 +1,7 @@
 // library imports
+import { streamText } from "ai";
 import { createOAuthDeviceAuth } from "@octokit/auth-oauth-device";
-import { select } from "@inquirer/prompts";
+import { input, select } from "@inquirer/prompts";
 // node imports
 import readline from "readline/promises";
 // local imports
@@ -10,7 +11,13 @@ import {
   SWALE_GITHUB_ISSES_LINK,
 } from "./constants.js";
 import { createUserObject, insertUser, listAllUsers, loginUser } from "./users/main.js";
-import { createOrUpdateConfig, getGithubAuth } from "./utils.js";
+import {
+  askForLLMDetails,
+  createOrUpdateConfig,
+  getGithubAuth,
+  getLlmDetails,
+  resolveModel,
+} from "./utils.js";
 import type { LeetcodeBasicDetailsMeta, LeetcodeProfileDetails } from "./models.js";
 import { getGithubUserProfileDetails, getOctokit } from "./octokit.js";
 import {
@@ -193,14 +200,20 @@ const auth = createOAuthDeviceAuth({
 });
 
 export async function onboarding() {
-  if (!process.stdin.isTTY) {
-    console.error("Swale needs an interactive terminal to function.");
-    process.exit(1);
-  }
-
   // @TODO - refactor this function
   const existingAuth = getGithubAuth();
   if (!existingAuth?.token) {
+    /*
+     * Only sign-in needs a person at the keyboard. Guarding the whole function
+     * would break `swale todo list | grep ...` and `swale gh sync > file`,
+     * which are ordinary things to do with a CLI.
+     */
+    if (!process.stdin.isTTY) {
+      console.error(
+        "Swale needs an interactive terminal to connect your GitHub account.\nRun it once in a terminal first.",
+      );
+      process.exit(1);
+    }
     // maybe the user is logging in after logging out
     // show all the users from which they can select
     // the one to make active
@@ -311,6 +324,13 @@ export async function onboarding() {
             const username: string = await rl.question(
               "What is your leetcode username? It will be saved locally. [Press Enter to Skip]: ",
             );
+            // ask for LLM details
+            const llmStatus = await askForLLMDetails();
+            if (!llmStatus) {
+              console.warn(
+                "Something went wrong while configuring the LLM. AI features will not work till its fixed...",
+              );
+            }
             rl.close();
             if (username?.trim()?.length) {
               const basicDetails: LeetcodeBasicDetailsMeta =
@@ -377,4 +397,38 @@ export async function onboarding() {
     }
     return;
   }
+}
+
+export async function streamChat() {
+  let llm = getLlmDetails();
+  if (!llm) {
+    const status = await askForLLMDetails();
+    if (!status) {
+      console.error("Something is wrong in the LLM configuration");
+    }
+  }
+  llm = getLlmDetails();
+  if (!llm) {
+    console.error("ERROR_NO_LLM_FOUND");
+    process.exit(1);
+  }
+  const model = resolveModel(llm);
+
+  const prompt = await input({
+    message: "Ask something >",
+    default: "Tell me something about this application",
+  });
+
+  const { textStream } = streamText({
+    model,
+    prompt,
+    temperature: 0,
+    reasoning: "none",
+  });
+
+  for await (const textPart of textStream) {
+    process.stdout.write(textPart);
+  }
+
+  process.stdout.write("\n");
 }

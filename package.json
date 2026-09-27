@@ -1,25 +1,23 @@
 {
   "name": "@itssayantan/swale",
   "version": "0.2.0",
-  "description": "Multi-interface developer life assistant unifying GitHub PRs, notes, TODOs, and personal expenses.",
+  "description": "A local-first developer assistant for your terminal \u2014 tasks, notes, spending, GitHub and LeetCode, with a local or hosted LLM.",
   "keywords": [
     "swale",
-    "dev",
-    "life-assistant",
-    "dev",
-    "life",
+    "cli",
+    "developer-tools",
+    "local-first",
+    "terminal",
     "todo",
-    "note",
-    "PR",
+    "notes",
+    "expenses",
     "github",
-    "telegram",
-    "AI",
-    "agent",
-    "Ollama",
-    "qwen",
+    "leetcode",
     "ai",
-    "sdk",
-    "vercel-ai-sdk"
+    "llm",
+    "ollama",
+    "vercel-ai-sdk",
+    "sqlite"
   ],
   "homepage": "https://github.com/sayantanghosh-in/swale#readme",
   "bugs": {
@@ -51,6 +49,10 @@
     "prepublishOnly": "pnpm typecheck && pnpm build"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.65",
+    "@ai-sdk/openai": "^4.0.78",
+    "@ai-sdk/openai-compatible": "^3.0.57",
+    "@ai-sdk/provider": "^4.0.18",
     "@inquirer/prompts": "^8.6.0",
     "@octokit/auth-oauth-device": "^8.0.5",
     "ai": "^7.0.65",

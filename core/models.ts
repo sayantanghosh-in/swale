@@ -117,3 +117,11 @@ export type LeetcodeProfileDetails = {
     lang: string;
   }[];
 };
+
+export type LLMConfig = {
+  type: string;
+  baseUrl: string;
+  model: string;
+  provider?: string;
+  apiKey?: string;
+};

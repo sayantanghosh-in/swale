@@ -3,6 +3,9 @@ import type { GithubRepositoryDetails, GithubUserProfileDetails } from "./models
 
 type OctokitOptions = ConstructorParameters<typeof Octokit>[0];
 
+const DEFAULT_REPO_LIMIT = 5;
+const MAX_REPO_LIMIT = 100; // GitHub's per_page ceiling
+
 let oct: Octokit | null = null;
 
 export const getOctokit = (config: OctokitOptions): Octokit | null => {
@@ -34,16 +37,31 @@ export async function getGithubUserProfileDetails(): Promise<GithubUserProfileDe
   };
 }
 
-export async function listRepositories(): Promise<GithubRepositoryDetails | null> {
-  if (!oct) {
+/**
+ * Recently updated repositories for `login`.
+ *
+ * Uses /users/{login}/repos rather than /user/repos on purpose: the latter
+ * needs the `repo` scope to return anything, and swale deliberately asks for
+ * read:user and user:email only.
+ */
+export async function listRepositories(
+  login: string,
+  limit: number = DEFAULT_REPO_LIMIT,
+): Promise<GithubRepositoryDetails | null> {
+  if (!oct || !login) {
     return null;
   }
 
-  // Get the list of repositories
-  const res = await oct.request("/users/sayantanghosh-in/repos?per_page=2&sort=updated", {
+  const perPage = Math.min(Math.max(limit, 1), MAX_REPO_LIMIT);
+
+  const res = await oct.request("GET /users/{username}/repos", {
+    username: login,
+    per_page: perPage,
+    sort: "updated",
     headers: {
       "X-GitHub-Api-Version": "2026-03-10",
     },
   });
+
   return { res };
 }

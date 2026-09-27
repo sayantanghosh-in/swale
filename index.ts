@@ -12,11 +12,12 @@ import {
 import { executeNoteAction } from "./core/notes/utils.js";
 import { executeTodoAction } from "./core/todos/utils.js";
 import { deactivateAllUsers, getActiveUser } from "./core/users/main.js";
-import { parsePackageJsonContents } from "./core/utils.js";
+import { askForLLMDetails, getGithubAuth, parsePackageJsonContents } from "./core/utils.js";
 // library imports
-import { getLeetcodeProfileDetails, onboarding } from "./core/services.js";
+import { getLeetcodeProfileDetails, onboarding, streamChat } from "./core/services.js";
 import { listRepositories } from "./core/octokit.js";
-import { fetchLeetcodeLoginByProvider } from "./core/connections/main.js";
+import { fetchLoginByProvider } from "./core/connections/main.js";
+import chalk from "chalk";
 
 const packageJsonContents = parsePackageJsonContents();
 
@@ -86,16 +87,39 @@ program
   .command("github")
   .alias("gh")
   .argument("<action>", "sync")
-  .action(async (action: "sync") => {
-    if (action === "sync") {
-      const profileDetils = await listRepositories();
-      if (!profileDetils) {
-        console.error("ERROR_GITHUB_SYNC");
-        process.exit(1);
-      }
-      const { res } = profileDetils;
-      console.log(formatLastRepositories(res?.data));
+  .option("-n, --limit <count>", "how many repositories to show", "5")
+  .action(async (action: "sync", options: { limit: string }) => {
+    if (action !== "sync") {
+      console.error("ERROR_UNKNOWN_GITHUB_ACTION");
+      process.exit(1);
     }
+
+    const activeUser = getActiveUser();
+    if (!activeUser?.id) {
+      console.error("ERROR_NO_USER_FOUND");
+      process.exit(1);
+    }
+
+    // Whose repositories to read comes from the signed-in account, never a
+    // hardcoded login.
+    const githubConnection = fetchLoginByProvider(activeUser.id, "github");
+    if (!githubConnection?.success || !githubConnection?.login) {
+      console.error("ERROR_NO_GITHUB_CONNECTION");
+      process.exit(1);
+    }
+
+    const limit = Number.parseInt(options.limit, 10);
+    const repositories = await listRepositories(
+      githubConnection.login,
+      Number.isNaN(limit) ? undefined : limit,
+    );
+
+    if (!repositories) {
+      console.error("ERROR_GITHUB_SYNC");
+      process.exit(1);
+    }
+
+    console.log(formatLastRepositories(repositories.res?.data));
   });
 
 // Utility commands
@@ -114,7 +138,7 @@ program
       // search for an existing leetcode connection for the loggedin user
       const activeUser = getActiveUser();
       if (activeUser?.id) {
-        const leetcodeConnectionResponse = fetchLeetcodeLoginByProvider(activeUser?.id, "leetcode");
+        const leetcodeConnectionResponse = fetchLoginByProvider(activeUser?.id, "leetcode");
         if (!leetcodeConnectionResponse?.success) {
           console.error("ERROR_LEETCODE_CONNECTION");
         } else {
@@ -141,4 +165,20 @@ program
     }
   });
 
+// AI commands
+program.command("llm").action(async () => {
+  const status = await askForLLMDetails();
+  if (!status) {
+    console.error("Something is wrong in the LLM configuration");
+  } else {
+    console.log(chalk.cyan("🚀 LLM connected successfully..."));
+  }
+});
+
+program
+  .command("chat")
+  .alias("c")
+  .action(async () => {
+    streamChat();
+  });
 await program.parseAsync();
