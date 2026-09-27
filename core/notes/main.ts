@@ -24,9 +24,15 @@ export const createNoteObject = (
 export const addNote = (note: NoteRecord) => {
   // add the note to the 'notes' table
   const preparedInsert = db.prepare(
-    "INSERT INTO notes (id, text, created_at, updated_at, created_by) VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)",
+    "INSERT INTO notes (id, text, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?)",
   );
-  const ranInsertStatement = preparedInsert.run(note.id, note.text, note.createdBy);
+  const ranInsertStatement = preparedInsert.run(
+    note.id,
+    note.text,
+    note.createdAt.toISOString(),
+    note.updatedAt.toISOString(),
+    note.createdBy,
+  );
   return {
     success: ranInsertStatement?.changes === 1,
     note,
@@ -69,9 +75,9 @@ export const updateNote = (createdBy: string, id: string, text: string) => {
   }
 
   const preparedUpdate = db.prepare(
-    "UPDATE notes SET text = ?, updated_at = CURRENT_TIMESTAMP where created_by = ? and id = ?",
+    "UPDATE notes SET text = ?, updated_at = ? where created_by = ? and id = ?",
   );
-  const ranPreparedUpdate = preparedUpdate.run(text, createdBy, id);
+  const ranPreparedUpdate = preparedUpdate.run(text, new Date().toISOString(), createdBy, id);
   return {
     success: ranPreparedUpdate?.changes === 1,
     error: ranPreparedUpdate?.changes !== 1 ? "DB_ERROR" : null,

@@ -26,9 +26,16 @@ export const createTodoObject = (
 export const addTodo = (todo: TodoRecord) => {
   // add the todo to the 'todos' table
   const preparedInsert = db.prepare(
-    "INSERT INTO todos (id, text, status, created_at, updated_at, created_by) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)",
+    "INSERT INTO todos (id, text, status, created_at, updated_at, created_by) VALUES (?, ?, ?, ?, ?, ?)",
   );
-  const ranInsertStatement = preparedInsert.run(todo.id, todo.text, todo.status, todo.createdBy);
+  const ranInsertStatement = preparedInsert.run(
+    todo.id,
+    todo.text,
+    todo.status,
+    todo.createdAt.toISOString(),
+    todo.updatedAt.toISOString(),
+    todo.createdBy,
+  );
   return {
     success: ranInsertStatement?.changes === 1,
     todo,
@@ -71,9 +78,9 @@ export const updateTodo = (createdBy: string, id: string, text: string) => {
   }
 
   const preparedUpdate = db.prepare(
-    "UPDATE todos SET text = ?, updated_at = CURRENT_TIMESTAMP where created_by = ? and id = ?",
+    "UPDATE todos SET text = ?, updated_at = ? where created_by = ? and id = ?",
   );
-  const ranPreparedUpdate = preparedUpdate.run(text, createdBy, id);
+  const ranPreparedUpdate = preparedUpdate.run(text, new Date().toISOString(), createdBy, id);
   return {
     success: ranPreparedUpdate?.changes === 1,
     error: ranPreparedUpdate?.changes !== 1 ? "DB_ERROR" : null,

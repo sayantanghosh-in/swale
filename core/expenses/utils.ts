@@ -56,7 +56,7 @@ export const executeExpenseAction = async (
       if (Array.isArray(expenses)) {
         if (expenses.length) {
           expenses.map((expense) => {
-            const utcDateString = (expense?.updated_at as string).replace(" ", "T") + "Z";
+            const utcDateString = expense?.updated_at as string;
             const isCreatedButNotEdited = isEqual(
               expense?.created_at as string,
               expense?.updated_at as string,
@@ -86,7 +86,7 @@ export const executeExpenseAction = async (
     case "read": {
       const expense = readExpense(createdBy, id);
       if (expense?.id) {
-        const utcDateString = (expense?.updated_at as string).replace(" ", "T") + "Z";
+        const utcDateString = expense?.updated_at as string;
         const isCreatedButNotEdited = isEqual(
           expense?.created_at as string,
           expense?.updated_at as string,
@@ -122,7 +122,7 @@ export const executeExpenseAction = async (
       if (Array.isArray(expenses)) {
         if (expenses.length) {
           expenses.map((expense) => {
-            const utcDateString = (expense?.updated_at as string).replace(" ", "T") + "Z";
+            const utcDateString = expense?.updated_at as string;
             const isCreatedButNotEdited = isEqual(
               expense?.created_at as string,
               expense?.updated_at as string,

@@ -1,13 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 
-/**
- * Index N upgrades the database TO version N+1.
- * APPEND ONLY — never edit an entry that has already run anywhere.
- */
-const migrations: Array<(db: DatabaseSync) => void> = [
-  // v1 — initial schema
-  (db) => {
-    db.exec(`
+// v1 — initial schema
+export const migrationFunction = (db: DatabaseSync): void => {
+  db.exec(`
         CREATE TABLE IF NOT EXISTS users (
             id         TEXT PRIMARY KEY,
             name       TEXT NOT NULL,
@@ -18,7 +13,7 @@ const migrations: Array<(db: DatabaseSync) => void> = [
             updated_at TEXT NOT NULL
         ) STRICT
     `);
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS todos (
             id         TEXT PRIMARY KEY,
             text       TEXT NOT NULL,
@@ -35,7 +30,7 @@ const migrations: Array<(db: DatabaseSync) => void> = [
             ON UPDATE CASCADE
         ) STRICT
     `);
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS expenses (
             id          TEXT PRIMARY KEY,
             description TEXT NOT NULL,
@@ -52,7 +47,7 @@ const migrations: Array<(db: DatabaseSync) => void> = [
             ON UPDATE CASCADE
         ) STRICT
     `);
-    db.exec(`
+  db.exec(`
         CREATE TABLE IF NOT EXISTS notes (
             id         TEXT PRIMARY KEY,
             text       TEXT NOT NULL,
@@ -68,29 +63,4 @@ const migrations: Array<(db: DatabaseSync) => void> = [
             ON UPDATE CASCADE
         ) STRICT
     `);
-  },
-];
-
-export const runMigrations = (db: DatabaseSync): void => {
-  const { user_version } = db.prepare("PRAGMA user_version").get() as {
-    user_version: number;
-  };
-  let version = user_version;
-
-  while (version < migrations.length) {
-    const migration = migrations[version];
-    if (!migration) break; // satisfies noUncheckedIndexedAccess
-
-    const next = version + 1;
-    db.exec("BEGIN");
-    try {
-      migration(db);
-      db.exec(`PRAGMA user_version = ${next}`);
-      db.exec("COMMIT");
-    } catch (err) {
-      db.exec("ROLLBACK");
-      throw err;
-    }
-    version = next;
-  }
 };
