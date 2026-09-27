@@ -46,7 +46,9 @@
     "build": "tsc",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepublishOnly": "pnpm typecheck && pnpm build"
+    "prepublishOnly": "pnpm typecheck && pnpm build",
+    "demo:seed": "node scripts/seed-demo.mjs",
+    "demo:record": "pnpm build && npm link && for t in demo github leetcode chat; do pnpm demo:seed && vhs docs/tape/$t.tape; done"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.65",

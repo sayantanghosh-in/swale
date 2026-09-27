@@ -6,6 +6,10 @@ A local-first command-line assistant for developers. Your tasks, notes, spending
 [![license](https://img.shields.io/npm/l/@itssayantan/swale.svg)](./LICENSE)
 [![node](https://img.shields.io/node/v/@itssayantan/swale.svg)](https://nodejs.org)
 
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Adding a todo and syncing GitHub repositories from the terminal with swale" width="900">
+</p>
+
 ---
 
 ## Contents
@@ -196,6 +200,8 @@ Last modified repos:
 💬 Make your Claude sessions click 😎
 ```
 
+<img src="docs/images/github.gif" alt="swale gh sync listing recently updated repositories" width="900">
+
 The account read is the one you signed in with — Swale looks the login up from your stored connection rather than assuming it.
 
 Swale requests only the `read:user` and `user:email` scopes, so it can read your public profile and nothing else. It cannot write to your repositories, and private repositories are not visible to it.
@@ -223,6 +229,8 @@ Last Solved:
 🔗 https://leetcode.com/problems/find-first-and-last-position-of-element-in-sorted-array
 ```
 
+<img src="docs/images/leetcode.gif" alt="swale lc showing ranking, solved counts and recent submissions" width="900">
+
 Only public profile data is read, and no LeetCode credentials are involved — just the username.
 
 ### `swale llm`
@@ -247,6 +255,10 @@ Ask the connected model a question. Aliased to `swale c`. The reply streams back
 $ swale chat
 ? Ask something > Explain the difference between a rebase and a merge
 ```
+
+<img src="docs/images/chat.gif" alt="swale chat streaming an answer from a local model" width="900">
+
+The recording above is a real response from `qwen2.5:7b` running locally through Ollama — nothing left the machine.
 
 If no model is configured yet, `swale chat` runs the `swale llm` setup first, then continues.
 
@@ -386,6 +398,17 @@ Set `SWALE_DATA_DIR` while developing so you don't write to your real database:
 ```bash
 SWALE_DATA_DIR=/tmp/swale-dev pnpm dev todo list
 ```
+
+### Re-recording the GIFs
+
+The recordings in this README are generated from [VHS](https://github.com/charmbracelet/vhs) tapes in `docs/tape/`, so they can be regenerated rather than re-recorded by hand.
+
+```bash
+brew install vhs
+pnpm demo:record
+```
+
+Each recording reseeds an isolated demo database first (`pnpm demo:seed`), because the commands genuinely mutate data — without it, a second run shows the first run's leftovers. Your own `~/.swale` is only ever read from.
 
 ---
 
