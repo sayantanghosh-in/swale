@@ -106,3 +106,10 @@ export const deleteNote = (createdBy: string, id: string) => {
     error: ranPreparedDelete?.changes !== 1 ? "DB_ERROR" : null,
   };
 };
+
+export const countNotes = (createdBy: string): number => {
+  const row = db
+    .prepare("SELECT COUNT(*) AS total FROM notes where created_by = ?")
+    .get(createdBy) as { total: number };
+  return row?.total ?? 0;
+};

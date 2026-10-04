@@ -2,7 +2,12 @@
 import { program } from "commander";
 import { select } from "@inquirer/prompts";
 import { executeExpenseAction } from "./core/expenses/utils.js";
-import { formatLastRepositories, formatLeetcodeContributions } from "./core/formatters.js";
+import {
+  formatGithubCalendar,
+  formatLastRepositories,
+  formatLeetcodeCalendar,
+  formatLeetcodeContributions,
+} from "./core/formatters.js";
 import {
   type LeetcodeProfileDetails,
   type SupportedCurrencies,
@@ -12,21 +17,45 @@ import {
 import { executeNoteAction } from "./core/notes/utils.js";
 import { executeTodoAction } from "./core/todos/utils.js";
 import { deactivateAllUsers, getActiveUser } from "./core/users/main.js";
-import { askForLLMDetails, getGithubAuth, parsePackageJsonContents } from "./core/utils.js";
+import {
+  askForLLMDetails,
+  fillCalendarWindow,
+  leetcodeCalendarToDays,
+  parsePackageJsonContents,
+} from "./core/utils.js";
+import { CALENDAR_WEEKS } from "./core/constants.js";
 // library imports
 import { getLeetcodeProfileDetails, onboarding, streamChat } from "./core/services.js";
-import { listRepositories } from "./core/octokit.js";
+import { getContributionCalendar, listRepositories } from "./core/octokit.js";
 import { fetchLoginByProvider } from "./core/connections/main.js";
+import { executeBackupAction, executeRestoreAction } from "./core/backup/utils.js";
+import { renderDashboard } from "./tui/index.js";
 import chalk from "chalk";
 
 const packageJsonContents = parsePackageJsonContents();
 
+const printLeetcodeCalendar = (data: LeetcodeProfileDetails): string =>
+  formatLeetcodeCalendar(
+    fillCalendarWindow(leetcodeCalendarToDays(data?.submissionCalendar ?? {}), CALENDAR_WEEKS * 7),
+    data?.activeYears ?? [],
+  );
+
+/*
+ * Commands that must run before there is an account to run them for. `restore`
+ * is the whole point of this list: on a new machine it is the first thing you
+ * type, and onboarding would otherwise demand a GitHub sign-in and exit first.
+ */
+const SKIPS_ONBOARDING = new Set(["restore", "help"]);
+
 // Registering the program
 program
-  .name(packageJsonContents?.name)
+  .name("swale")
   .description(packageJsonContents?.description)
   .version(packageJsonContents?.version)
-  .hook("preSubcommand", onboarding);
+  .hook("preSubcommand", async (_thisCommand, subcommand) => {
+    if (SKIPS_ONBOARDING.has(subcommand.name())) return;
+    await onboarding();
+  });
 
 // Registering all the commands
 // Module commands
@@ -119,6 +148,12 @@ program
       process.exit(1);
     }
 
+    const contributions = await getContributionCalendar(githubConnection.login, CALENDAR_WEEKS * 7);
+    if (contributions) {
+      const days = fillCalendarWindow(contributions.days, CALENDAR_WEEKS * 7);
+      console.log(formatGithubCalendar(days, githubConnection.login));
+    }
+
     console.log(formatLastRepositories(repositories.res?.data));
   });
 
@@ -134,6 +169,7 @@ program
     if (typeof username === "string" && username?.trim()?.length > 0) {
       const leetcodeData: LeetcodeProfileDetails = await getLeetcodeProfileDetails(username);
       console.log(formatLeetcodeContributions(leetcodeData, username));
+      console.log(printLeetcodeCalendar(leetcodeData));
     } else {
       // search for an existing leetcode connection for the loggedin user
       const activeUser = getActiveUser();
@@ -145,6 +181,7 @@ program
           const username = leetcodeConnectionResponse?.login;
           const leetcodeData: LeetcodeProfileDetails = await getLeetcodeProfileDetails(username);
           console.log(formatLeetcodeContributions(leetcodeData, username));
+          console.log(printLeetcodeCalendar(leetcodeData));
         }
       } else {
         console.error("ERROR_NO_USER_FOUND");
@@ -165,6 +202,23 @@ program
     }
   });
 
+// Data portability
+program
+  .command("backup")
+  .argument("[directory]", "where to write the archive (defaults to ~/.swale/backups)")
+  .description("Zip up your swale data so you can move it to another machine")
+  .action(async (directory?: string) => {
+    await executeBackupAction(directory);
+  });
+
+program
+  .command("restore")
+  .argument("<zipPath>", "path to a zip produced by `swale backup`")
+  .description("Replace the data on this machine with the contents of a backup")
+  .action(async (zipPath: string) => {
+    await executeRestoreAction(zipPath);
+  });
+
 // AI commands
 program.command("llm").action(async () => {
   const status = await askForLLMDetails();
@@ -181,4 +235,16 @@ program
   .action(async () => {
     streamChat();
   });
+/*
+ * Bare `swale` with no subcommand opens the dashboard. Registered as the
+ * default command so commander still runs the preSubcommand onboarding hook —
+ * checking argv by hand here would skip it.
+ */
+program
+  .command("dashboard", { isDefault: true })
+  .description("Your calendars, your numbers, and a prompt to ask about them")
+  .action(async () => {
+    await renderDashboard();
+  });
+
 await program.parseAsync();

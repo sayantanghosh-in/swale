@@ -128,3 +128,25 @@ export const deleteExpense = (createdBy: string, id: string) => {
     error: ranPreparedDelete?.changes !== 1 ? "DB_ERROR" : null,
   };
 };
+
+/**
+ * Totals over a date window. listExpenses caps at 5 rows, so it can show recent
+ * spending but cannot answer "how much did I spend this month".
+ */
+export const summariseExpenses = (createdBy: string, sinceISO?: string, untilISO?: string) => {
+  const since = sinceISO ?? "0000-01-01";
+  const until = untilISO ?? "9999-12-31";
+  const row = db
+    .prepare(
+      "SELECT COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total FROM expenses where created_by = ? AND created_at >= ? AND created_at <= ?",
+    )
+    .get(createdBy, since, until) as { count: number; total: number };
+
+  const top = db
+    .prepare(
+      "SELECT description, SUM(amount) AS total FROM expenses where created_by = ? AND created_at >= ? AND created_at <= ? GROUP BY description ORDER BY total DESC LIMIT 5",
+    )
+    .all(createdBy, since, until) as { description: string; total: number }[];
+
+  return { count: row?.count ?? 0, total: row?.total ?? 0, top };
+};

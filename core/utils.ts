@@ -8,10 +8,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 // node imports
 import fs, { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 // local imports
-import type { LLMConfig, PackageJsonContents } from "./models.js";
+import type { CalendarDay, CalendarStats, LLMConfig, PackageJsonContents } from "./models.js";
+import { BACKUP_DIR_NAME } from "./constants.js";
 
 /**
  * Locates this package's own package.json by walking up from this file's
@@ -85,6 +87,17 @@ export function configPath(): string {
   return path.join(ensureDataDir(), "config.json");
 }
 
+export function backupDir(): string {
+  const dir = path.join(ensureDataDir(), BACKUP_DIR_NAME);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return dir;
+}
+
+/** True once onboarding has stored a GitHub token. */
+export function isConfigured(): boolean {
+  return Boolean(getGithubAuth()?.token);
+}
+
 export type SwaleConfig = Record<string, unknown>;
 
 /**
@@ -139,6 +152,49 @@ export function getGithubAuth(): OAuthAppAuthentication | undefined {
 export function getLlmDetails(): LLMConfig | undefined {
   const llm = readConfig()?.["llm"];
   return llm && typeof llm === "object" ? (llm as LLMConfig) : undefined;
+}
+
+/**
+ * Puts text on the system clipboard.
+ *
+ * Shells out to the platform tool rather than using an OSC 52 escape: OSC 52
+ * is silently dropped or truncated by several terminals, and failing quietly
+ * is the one thing a copy must not do.
+ */
+export function copyToClipboard(text: string): boolean {
+  const candidates: [string, string[]][] =
+    process.platform === "darwin"
+      ? [["pbcopy", []]]
+      : process.platform === "win32"
+        ? [["clip", []]]
+        : [
+            ["wl-copy", []],
+            ["xclip", ["-selection", "clipboard"]],
+            ["xsel", ["--clipboard", "--input"]],
+          ];
+
+  for (const [command, args] of candidates) {
+    const result = spawnSync(command, args, { input: text });
+    if (result.status === 0) return true;
+  }
+  return false;
+}
+
+/** Swaps just the model, leaving the provider and credentials untouched. */
+export function setLlmModel(model: string): boolean {
+  const llm = getLlmDetails();
+  if (!llm) return false;
+  createOrUpdateConfig({ llm: { ...llm, model } });
+  return true;
+}
+
+/** How the current model is labelled in the UI: where it runs, and which one. */
+export function describeLlm(llm: LLMConfig | undefined): { provider: string; model: string } {
+  if (!llm) return { provider: "no model", model: "run /model" };
+  if (llm.type === "local") {
+    return { provider: llm.baseUrl.replace(/^https?:\/\//, ""), model: llm.model };
+  }
+  return { provider: llm.provider ?? "remote", model: llm.model };
 }
 
 export async function askForLLMDetails(): Promise<{ success: boolean }> {
@@ -268,4 +324,88 @@ export function resolveModel(llm: LLMConfig): LanguageModel {
     default:
       throw new Error(`Unsupported provider: ${llm.provider}`);
   }
+}
+
+/* --------------------------------------------------------------------------
+ * Contribution calendars
+ * ----------------------------------------------------------------------- */
+
+/** Local YYYY-MM-DD. toISOString() would shift the day for anyone east of UTC. */
+export function toDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** LeetCode returns { unixSeconds: count }. GitHub already gives dates. */
+export function leetcodeCalendarToDays(calendar: Record<string, number>): CalendarDay[] {
+  return Object.entries(calendar ?? {})
+    .map(([seconds, count]) => ({
+      date: toDateKey(new Date(Number(seconds) * 1000)),
+      count: Number(count) || 0,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Pads a sparse series out to one entry per day, ending today. Both sources
+ * omit empty days, and a calendar with holes in it draws wrong.
+ */
+export function fillCalendarWindow(days: CalendarDay[], totalDays: number): CalendarDay[] {
+  const counts = new Map(days.map((day) => [day.date, day.count]));
+  const filled: CalendarDay[] = [];
+  const cursor = new Date();
+  cursor.setHours(12, 0, 0, 0); // midday, so DST never rolls the date back
+
+  for (let i = totalDays - 1; i >= 0; i--) {
+    const day = new Date(cursor);
+    day.setDate(day.getDate() - i);
+    const key = toDateKey(day);
+    filled.push({ date: key, count: counts.get(key) ?? 0 });
+  }
+
+  return filled;
+}
+
+export function calendarStats(days: CalendarDay[]): CalendarStats {
+  let total = 0;
+  let activeDays = 0;
+  let longestStreak = 0;
+  let running = 0;
+  let best: CalendarDay | null = null;
+
+  for (const day of days) {
+    total += day.count;
+    if (day.count > 0) {
+      activeDays += 1;
+      running += 1;
+      if (running > longestStreak) longestStreak = running;
+      if (!best || day.count > best.count) best = day;
+    } else {
+      running = 0;
+    }
+  }
+
+  // Today not being done yet is not a broken streak, so start from yesterday
+  // when today is empty.
+  let currentStreak = 0;
+  let index = days.length - 1;
+  if (index >= 0 && days[index]?.count === 0) index -= 1;
+  for (; index >= 0; index--) {
+    if ((days[index]?.count ?? 0) === 0) break;
+    currentStreak += 1;
+  }
+
+  return { total, activeDays, currentStreak, longestStreak, best };
+}
+
+/** Buckets a day into the 0-4 heat levels, scaled to this person's own busiest day. */
+export function heatLevel(count: number, max: number): number {
+  if (count <= 0) return 0;
+  if (max <= 1) return 4;
+  const ratio = count / max;
+  if (ratio > 0.75) return 4;
+  if (ratio > 0.5) return 3;
+  if (ratio > 0.25) return 2;
+  return 1;
 }

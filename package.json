@@ -1,7 +1,7 @@
 {
   "name": "@itssayantan/swale",
-  "version": "0.2.0",
-  "description": "A local-first developer assistant for your terminal \u2014 tasks, notes, spending, GitHub and LeetCode, with a local or hosted LLM.",
+  "version": "0.3.0",
+  "description": "A local-first developer assistant for your terminal \u2014 an agentic TUI over your todos, notes, spending, GitHub and LeetCode, with a local or hosted LLM.",
   "keywords": [
     "swale",
     "cli",
@@ -17,7 +17,13 @@
     "llm",
     "ollama",
     "vercel-ai-sdk",
-    "sqlite"
+    "sqlite",
+    "agent",
+    "ai-agent",
+    "tui",
+    "ink",
+    "tool-calling",
+    "backup"
   ],
   "homepage": "https://github.com/sayantanghosh-in/swale#readme",
   "bugs": {
@@ -48,7 +54,8 @@
     "format:check": "prettier --check .",
     "prepublishOnly": "pnpm typecheck && pnpm build",
     "demo:seed": "node scripts/seed-demo.mjs",
-    "demo:record": "pnpm build && npm link && for t in demo github leetcode chat; do pnpm demo:seed && vhs docs/tape/$t.tape; done"
+    "demo:record": "pnpm build && npm link && for t in dashboard queue backup github leetcode chat; do pnpm demo:seed && vhs docs/tape/$t.tape; done",
+    "logo": "node scripts/render-logo.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.65",
@@ -57,20 +64,31 @@
     "@ai-sdk/provider": "^4.0.18",
     "@inquirer/prompts": "^8.6.0",
     "@octokit/auth-oauth-device": "^8.0.5",
+    "adm-zip": "^0.6.1",
     "ai": "^7.0.65",
     "chalk": "^6.0.0",
     "commander": "^15.0.0",
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
+    "ink": "^7.1.1",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
     "octokit": "^5.0.5",
     "ollama-ai-provider-v2": "^4.0.1",
+    "react": "^19.3.0",
+    "string-width": "^8.3.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@octokit/types": "^18.0.0",
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^26.2.0",
+    "@types/react": "^19.3.0",
     "prettier": "^3.9.6",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

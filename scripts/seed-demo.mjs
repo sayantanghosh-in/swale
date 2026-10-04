@@ -20,9 +20,7 @@ const REAL_DIR = join(homedir(), ".swale");
 
 for (const file of ["config.json", "data.db"]) {
   if (!existsSync(join(REAL_DIR, file))) {
-    console.error(
-      `Missing ${join(REAL_DIR, file)}. Sign in with \`swale gh sync\` first.`,
-    );
+    console.error(`Missing ${join(REAL_DIR, file)}. Sign in with \`swale gh sync\` first.`);
     process.exit(1);
   }
 }
@@ -60,24 +58,15 @@ const todo = db.prepare(
 const note = db.prepare(
   "INSERT INTO notes (id,text,created_at,updated_at,created_by) VALUES (?,?,?,?,?)",
 );
-[
-  ["LangGraph: nodes return dicts, edge functions return string labels", 124],
-].forEach(([text, minutes]) =>
-  note.run(randomUUID(), text, ago(minutes), ago(minutes), user.id),
+[["LangGraph: nodes return dicts, edge functions return string labels", 124]].forEach(
+  ([text, minutes]) => note.run(randomUUID(), text, ago(minutes), ago(minutes), user.id),
 );
 
 const expense = db.prepare(
   "INSERT INTO expenses (id,description,amount,created_at,updated_at,created_by) VALUES (?,?,?,?,?,?)",
 );
 [["Runpod GPU hours", 1840, 302]].forEach(([description, amount, minutes]) =>
-  expense.run(
-    randomUUID(),
-    description,
-    amount,
-    ago(minutes),
-    ago(minutes),
-    user.id,
-  ),
+  expense.run(randomUUID(), description, amount, ago(minutes), ago(minutes), user.id),
 );
 
 console.log(`Demo data ready in ${DEMO_DIR}`);
