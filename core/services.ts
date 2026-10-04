@@ -1,5 +1,6 @@
 // library imports
-import { streamText } from "ai";
+import chalk from "chalk";
+import type { ModelMessage } from "ai";
 import { createOAuthDeviceAuth } from "@octokit/auth-oauth-device";
 import { input, select } from "@inquirer/prompts";
 // node imports
@@ -25,6 +26,16 @@ import {
   insertConnection,
   validateGithubLoginWithExistingConnection,
 } from "./connections/main.js";
+import { resolveAgentContext, runAgent } from "./agent.js";
+import { CALENDAR_WEEKS, COLORS } from "./constants.js";
+import { calendarStats, fillCalendarWindow, leetcodeCalendarToDays, toDateKey } from "./utils.js";
+import { getContributionCalendar } from "./octokit.js";
+import { countTodosByStatus, listTodos } from "./todos/main.js";
+import { countNotes } from "./notes/main.js";
+import { summariseExpenses } from "./expenses/main.js";
+import { fetchLoginByProvider } from "./connections/main.js";
+import { getActiveUser } from "./users/main.js";
+import type { DashboardSnapshot } from "./models.js";
 
 async function queryLeetCode<T = any>(
   query: string,
@@ -99,8 +110,9 @@ export async function getLeetcodeBasicDetails(username: string): Promise<Leetcod
 }
 
 export async function getLeetcodeProfileDetails(username: string): Promise<LeetcodeProfileDetails> {
+  const currentYear = new Date().getFullYear();
   const query = `
-    query getProfileDetails($username: String!) {
+    query getProfileDetails($username: String!, $year: Int!, $prevYear: Int!) {
       matchedUser(username: $username) {
         profile {
           ranking
@@ -117,7 +129,11 @@ export async function getLeetcodeProfileDetails(username: string): Promise<Leetc
             submissions
           }
         }
-        userCalendar {
+        userCalendar(year: $year) {
+          submissionCalendar
+          activeYears
+        }
+        previousCalendar: userCalendar(year: $prevYear) {
           submissionCalendar
         }
       }
@@ -142,7 +158,8 @@ export async function getLeetcodeProfileDetails(username: string): Promise<Leetc
         acSubmissionNum: { difficulty: string; count: number; submissions: number }[];
         totalSubmissionNum: { difficulty: string; count: number; submissions: number }[];
       };
-      userCalendar: { submissionCalendar: string };
+      userCalendar: { submissionCalendar: string; activeYears: number[] };
+      previousCalendar: { submissionCalendar: string };
     };
     allQuestionsCount: { difficulty: string; count: number }[];
     recentSubmissionList: {
@@ -152,7 +169,7 @@ export async function getLeetcodeProfileDetails(username: string): Promise<Leetc
       statusDisplay: string;
       lang: string;
     }[];
-  }>(query, { username });
+  }>(query, { username, year: currentYear, prevYear: currentYear - 1 });
 
   const totalSolved =
     data.matchedUser.submitStats.acSubmissionNum.find((d) => d.difficulty === "All")?.count ?? 0;
@@ -165,9 +182,12 @@ export async function getLeetcodeProfileDetails(username: string): Promise<Leetc
     submissions: d.submissions,
   }));
 
-  const submissionCalendar: { [key: string]: number } = JSON.parse(
-    data.matchedUser.userCalendar.submissionCalendar || "{}",
-  );
+  // Two years merged: a rolling six-month window straddles New Year, and
+  // userCalendar only ever returns the single year it is asked for.
+  const submissionCalendar: { [key: string]: number } = {
+    ...JSON.parse(data.matchedUser.previousCalendar?.submissionCalendar || "{}"),
+    ...JSON.parse(data.matchedUser.userCalendar?.submissionCalendar || "{}"),
+  };
 
   const recentSubmissions = data.recentSubmissionList.map((sub) => {
     return {
@@ -181,6 +201,7 @@ export async function getLeetcodeProfileDetails(username: string): Promise<Leetc
 
   return {
     submissionCalendar,
+    activeYears: data.matchedUser.userCalendar?.activeYears ?? [],
     ranking: data.matchedUser.profile.ranking,
     totalSolved,
     totalQuestions,
@@ -399,12 +420,128 @@ export async function onboarding() {
   }
 }
 
+/**
+ * Models already pulled on the local Ollama host.
+ *
+ * Only meaningful for a local setup — a hosted provider has a catalogue, not
+ * an installed list, so /model there can only confirm what is configured.
+ */
+export async function listLocalModels(baseUrl: string): Promise<string[]> {
+  try {
+    const root = baseUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+    const response = await fetch(`${root}/api/tags`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { models?: { name?: string }[] };
+    return (data.models ?? [])
+      .map((entry) => entry?.name)
+      .filter((name): name is string => Boolean(name))
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Everything the dashboard shows, in one pass.
+ *
+ * The two network calls run together and each one is allowed to fail on its
+ * own — a rate-limited GitHub should dim one panel, not blank the screen.
+ */
+export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
+  const errors: string[] = [];
+  const user = getActiveUser() ?? null;
+
+  if (!user?.id) {
+    return {
+      user: null,
+      githubLogin: null,
+      leetcodeUsername: null,
+      github: null,
+      leetcode: null,
+      todos: { open: 0, recent: [] },
+      notes: { total: 0 },
+      expenses: { monthTotal: 0, monthCount: 0, currency: "INR" },
+      errors: ["Not signed in. Run `swale` in a terminal to connect GitHub."],
+    };
+  }
+
+  const githubConnection = fetchLoginByProvider(user.id, "github");
+  const leetcodeConnection = fetchLoginByProvider(user.id, "leetcode");
+  const githubLogin = githubConnection?.success ? githubConnection.login : null;
+  const leetcodeUsername = leetcodeConnection?.success ? leetcodeConnection.login : null;
+  const window = CALENDAR_WEEKS * 7;
+
+  const [githubResult, leetcodeResult] = await Promise.allSettled([
+    githubLogin ? getContributionCalendar(githubLogin, window) : Promise.resolve(null),
+    leetcodeUsername ? getLeetcodeProfileDetails(leetcodeUsername) : Promise.resolve(null),
+  ]);
+
+  let github: DashboardSnapshot["github"] = null;
+  if (githubResult.status === "fulfilled" && githubResult.value) {
+    const days = fillCalendarWindow(githubResult.value.days, window);
+    github = { days, stats: calendarStats(days), total: githubResult.value.total };
+  } else if (githubLogin) {
+    errors.push("GitHub contributions could not be loaded.");
+  }
+
+  let leetcode: DashboardSnapshot["leetcode"] = null;
+  if (leetcodeResult.status === "fulfilled" && leetcodeResult.value) {
+    const profile = leetcodeResult.value;
+    const days = fillCalendarWindow(leetcodeCalendarToDays(profile.submissionCalendar), window);
+    leetcode = { days, stats: calendarStats(days), profile };
+  } else if (leetcodeUsername) {
+    errors.push("LeetCode profile could not be loaded.");
+  }
+
+  const statusCounts = countTodosByStatus(user.id);
+  const open = statusCounts
+    .filter((row) => row.status !== "done")
+    .reduce((sum, row) => sum + row.total, 0);
+
+  const now = new Date();
+  const monthStart = toDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
+  const spend = summariseExpenses(user.id, monthStart);
+
+  return {
+    user,
+    githubLogin,
+    leetcodeUsername,
+    github,
+    leetcode,
+    todos: {
+      open,
+      recent: listTodos(user.id).map((todo: any) => ({
+        id: String(todo?.id ?? ""),
+        text: String(todo?.text ?? ""),
+        status: String(todo?.status ?? "todo"),
+      })),
+    },
+    notes: { total: countNotes(user.id) },
+    expenses: {
+      monthTotal: spend.total,
+      monthCount: spend.count,
+      currency: user.currency ?? "INR",
+    },
+    errors,
+  };
+}
+
+/**
+ * `swale chat` — a REPL over the agent.
+ *
+ * The whole transcript goes back every turn, so "and the week before?" means
+ * something. A fresh prompt array each time would make every question the
+ * first one.
+ */
 export async function streamChat() {
   let llm = getLlmDetails();
   if (!llm) {
     const status = await askForLLMDetails();
-    if (!status) {
+    if (!status?.success) {
       console.error("Something is wrong in the LLM configuration");
+      process.exit(1);
     }
   }
   llm = getLlmDetails();
@@ -412,23 +549,50 @@ export async function streamChat() {
     console.error("ERROR_NO_LLM_FOUND");
     process.exit(1);
   }
-  const model = resolveModel(llm);
 
-  const prompt = await input({
-    message: "Ask something >",
-    default: "Tell me something about this application",
-  });
-
-  const { textStream } = streamText({
-    model,
-    prompt,
-    temperature: 0,
-    reasoning: "none",
-  });
-
-  for await (const textPart of textStream) {
-    process.stdout.write(textPart);
+  const ctx = resolveAgentContext();
+  if (!ctx) {
+    console.error("ERROR_NO_USER_FOUND");
+    process.exit(1);
   }
 
-  process.stdout.write("\n");
+  console.log(
+    chalk.hex(COLORS.ORANGE).bold(`\nswale chat`) +
+      chalk.gray(` — ${llm.model} via ${llm.type === "local" ? llm.baseUrl : llm.provider}`),
+  );
+  console.log(chalk.gray("Ask about your todos, notes, spending, GitHub or LeetCode."));
+  console.log(chalk.gray("Ctrl+C to leave.\n"));
+
+  const history: ModelMessage[] = [];
+
+  for (;;) {
+    const prompt = await input({ message: chalk.hex(COLORS.ORANGE)("you ›") });
+    if (!prompt.trim().length) continue;
+    if (["exit", "quit", ":q"].includes(prompt.trim().toLowerCase())) return;
+
+    history.push({ role: "user", content: prompt });
+
+    let streamed = false;
+    try {
+      const { text } = await runAgent(ctx, {
+        messages: history,
+        onToolCall: ({ name }) => {
+          process.stdout.write(chalk.gray(`  ⚙ ${name}\n`));
+        },
+        onText: (chunk) => {
+          if (!streamed) {
+            process.stdout.write(chalk.cyan("swale › "));
+            streamed = true;
+          }
+          process.stdout.write(chunk);
+        },
+      });
+
+      process.stdout.write("\n\n");
+      history.push({ role: "assistant", content: text });
+    } catch (error) {
+      console.error(chalk.red(`\n  ${error instanceof Error ? error.message : String(error)}\n`));
+      history.pop();
+    }
+  }
 }

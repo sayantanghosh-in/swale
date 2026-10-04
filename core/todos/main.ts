@@ -109,3 +109,34 @@ export const deleteTodo = (createdBy: string, id: string) => {
     error: ranPreparedDelete?.changes !== 1 ? "DB_ERROR" : null,
   };
 };
+
+export const setTodoStatus = (createdBy: string, id: string, status: TodoRecord["status"]) => {
+  const matchingTodo = db
+    .prepare("SELECT id FROM todos where created_by = ? AND id = ?")
+    .get(createdBy, id);
+  if (!matchingTodo?.id) {
+    return { success: false, error: "TODO_NOT_FOUND" };
+  }
+
+  const ran = db
+    .prepare("UPDATE todos SET status = ?, updated_at = ? where created_by = ? and id = ?")
+    .run(status, new Date().toISOString(), createdBy, id);
+  return {
+    success: ran?.changes === 1,
+    error: ran?.changes !== 1 ? "DB_ERROR" : null,
+  };
+};
+
+export const countTodosByStatus = (createdBy: string) => {
+  return db
+    .prepare("SELECT status, COUNT(*) AS total FROM todos where created_by = ? GROUP BY status")
+    .all(createdBy) as { status: string; total: number }[];
+};
+
+export const findTodosByText = (createdBy: string, text: string) => {
+  return db
+    .prepare(
+      "SELECT id, text, status FROM todos where created_by = ? AND text LIKE (?) ORDER BY updated_at DESC LIMIT 10",
+    )
+    .all(createdBy, `%${text}%`) as { id: string; text: string; status: string }[];
+};

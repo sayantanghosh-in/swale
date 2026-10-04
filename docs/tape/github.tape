@@ -1,7 +1,7 @@
 Output docs/images/github.gif
 Source docs/tape/_settings.tape
 
-Set Height 420
+Set Height 640
 
 Hide
 Type "export SWALE_DATA_DIR=/tmp/swale-demo"  Enter

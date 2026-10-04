@@ -1,7 +1,7 @@
 Output docs/images/leetcode.gif
 Source docs/tape/_settings.tape
 
-Set Height 620
+Set Height 780
 
 Hide
 Type "export SWALE_DATA_DIR=/tmp/swale-demo"  Enter

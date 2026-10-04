@@ -1,10 +1,10 @@
-# Runs against whatever model is configured locally. With Ollama this is a real
-# response, streamed, not a scripted one.
+# `swale chat` is the same agent as the dashboard, without the dashboard.
+# Runs against whatever model is configured locally, so the reply is real.
 
 Output docs/images/chat.gif
 Source docs/tape/_settings.tape
 
-Set Height 400
+Set Height 520
 
 Hide
 Type "export SWALE_DATA_DIR=/tmp/swale-demo"  Enter
@@ -15,7 +15,11 @@ Show
 Sleep 500ms
 Type "swale chat"  Sleep 300ms  Enter
 Sleep 1.4s
-Type "In one sentence: what is a git rebase?"
+Type "how much have I spent this month?"
 Sleep 400ms
 Enter
-Sleep 10s
+Sleep 14s
+Type "and what is still on my todo list?"
+Sleep 400ms
+Enter
+Sleep 15s

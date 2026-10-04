@@ -4,12 +4,12 @@
 Require swale
 
 Set Shell "bash"
-Set FontSize 16
-Set Width 1100
-Set Height 560
-Set Padding 22
+Set FontSize 14
+Set Width 1180
+Set Height 880
+Set Padding 20
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 40ms
-Set Margin 12
-Set MarginFill "#1e1e2e"
+Set TypingSpeed 45ms
+Set Margin 14
+Set MarginFill "#11111b"
 Set BorderRadius 10

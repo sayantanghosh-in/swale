@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="swale">
+  <title>swale</title>
+  <defs>
+    <linearGradient id="w" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5BC4F1"/><stop offset="100%" stop-color="#2B7FA8"/>
+    </linearGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F97D09"/><stop offset="50%" stop-color="#FFB366"/><stop offset="100%" stop-color="#F97D09"/>
+    </linearGradient>
+    <clipPath id="ch">
+      <path d="M150 224 C206 224 213 350 269 350 L299 350 C355 350 362 224 418 224 Z"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="104" fill="#11111b"/>
+
+  <g stroke="#3FA7D6" stroke-width="13" stroke-linecap="round" opacity="0.85">
+    <line x1="212" y1="104" x2="200" y2="150"/>
+    <line x1="272" y1="88" x2="260" y2="136"/>
+    <line x1="332" y1="104" x2="320" y2="150"/>
+  </g>
+
+  <g clip-path="url(#ch)">
+    <rect x="140" y="296" width="240" height="60" fill="url(#w)" opacity="0.42"/>
+    <g stroke="#7FD4F5" stroke-width="13" stroke-linecap="round" fill="none">
+      <path d="M216 316 q22 -15 44 0 t44 0"/>
+    </g>
+  </g>
+
+  <path d="M68 224 L150 224 C206 224 213 350 269 350 L299 350 C355 350 362 224 418 224 L444 224"
+        fill="none" stroke="url(#g)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g stroke="#4FA355" stroke-width="12" stroke-linecap="round" fill="none">
+    <path d="M106 214 v-46 M84 214 q5 -34 -13 -52 M128 214 q-5 -34 13 -52"/>
+    <path d="M406 214 v-46 M384 214 q5 -34 -13 -52 M428 214 q-5 -34 13 -52"/>
+  </g>
+</svg>

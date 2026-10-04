@@ -101,6 +101,7 @@ export type LeetcodeProfileDetails = {
   submissionCalendar: {
     [key: string]: number;
   };
+  activeYears: number[];
   ranking: number;
   totalSolved: number;
   totalQuestions: number;
@@ -116,6 +117,71 @@ export type LeetcodeProfileDetails = {
     statusDisplay: string;
     lang: string;
   }[];
+};
+
+/** One cell of a contribution calendar, normalised across GitHub and LeetCode. */
+export type CalendarDay = {
+  date: string; // YYYY-MM-DD
+  count: number;
+};
+
+export type CalendarStats = {
+  total: number;
+  activeDays: number;
+  currentStreak: number;
+  longestStreak: number;
+  best: CalendarDay | null;
+};
+
+export type GithubContributions = {
+  total: number;
+  days: CalendarDay[];
+};
+
+export type BackupManifest = {
+  formatVersion: number;
+  swaleVersion: string;
+  createdAt: string;
+  user: { name: string; email?: string } | null;
+  counts: Record<string, number>;
+};
+
+export type DashboardSnapshot = {
+  user: UserRecord | null;
+  githubLogin: string | null;
+  leetcodeUsername: string | null;
+  github: { days: CalendarDay[]; stats: CalendarStats; total: number } | null;
+  leetcode: { days: CalendarDay[]; stats: CalendarStats; profile: LeetcodeProfileDetails } | null;
+  todos: { open: number; recent: { id: string; text: string; status: string }[] };
+  notes: { total: number };
+  expenses: { monthTotal: number; monthCount: number; currency: string };
+  errors: string[];
+};
+
+/** A file someone dropped into the composer. Nothing reads it yet. */
+export type Attachment = {
+  id: string;
+  path: string;
+  name: string;
+  ext: string;
+  kind: string;
+  icon: string;
+  bytes: number;
+  /** False until a reader exists for this kind. The UI says so rather than pretending. */
+  readable: boolean;
+};
+
+export type AgentContext = {
+  userId: string;
+  userName: string;
+  currency: string;
+  githubLogin: string | null;
+  leetcodeUsername: string | null;
+};
+
+export type AgentToolEvent = {
+  name: string;
+  input: unknown;
 };
 
 export type LLMConfig = {
