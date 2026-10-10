@@ -1,34 +1,36 @@
-# The hero recording: the dashboard, and the agent working from real data.
-#
-# `swale` with no arguments is the whole product on one screen, so this is the
-# tape that goes at the top of the README.
+# The hero recording: the dashboard, the palette, a skill, and the agent
+# drawing a calendar from a plain-English question.
 
 Output docs/images/dashboard.gif
 Source docs/tape/_settings.tape
 
-# Taller than the default so the mark survives two exchanges.
+# Taller than the default so the mark survives the whole recording.
 Set Height 1000
 
 Hide
 Type "export SWALE_DATA_DIR=/tmp/swale-demo"  Enter
+# Run this week's scheduled skills off-camera, so the recording opens on the
+# dashboard rather than five catch-up reports.
+Type "swale brief --run >/dev/null 2>&1; clear"  Enter
+Sleep 15s
 Type "export PS1='\033[38;5;208m❯\033[0m '"  Enter
 Type "clear"  Enter
 Show
 
 Sleep 500ms
 Type "swale"  Sleep 400ms  Enter
+Sleep 3s
 
-# Two network calls have to land before it can draw.
-Sleep 5s
-
-Type "what have I got left to do?"
-Sleep 600ms
+# The palette filters as you type; enter runs the highlighted command.
+Type "/"
+Sleep 1.4s
+Type "su"
+Sleep 1s
 Enter
-Sleep 15s
+Sleep 14s
 
-Type "mark the eval cases one done"
-Sleep 600ms
+Type "show me my leetcode calendar"
+Sleep 500ms
 Enter
-Sleep 15s
-
+Sleep 16s
 Sleep 2s

@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { migrationFunction as function_2026082701 } from "./2026082701.js";
 import { migrationFunction as function_2026092001 } from "./2026092001.js";
 import { migrationFunction as function_2026092002 } from "./2026092002.js";
+import { migrationFunction as function_2026101001 } from "./2026101001.js";
 
 /**
  * Index N upgrades the database TO version N+1.
@@ -14,6 +15,8 @@ const migrations: Array<(db: DatabaseSync) => void> = [
   function_2026092001,
   // 20 September 2026, migration - 2
   function_2026092002,
+  // 10 October 2026, migration - 1 (v1.0.0)
+  function_2026101001,
 ];
 
 export const runMigrations = (db: DatabaseSync): void => {

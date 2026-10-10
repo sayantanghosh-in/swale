@@ -1,7 +1,7 @@
 {
   "name": "@itssayantan/swale",
-  "version": "0.3.0",
-  "description": "A local-first developer assistant for your terminal \u2014 an agentic TUI over your todos, notes, spending, GitHub and LeetCode, with a local or hosted LLM.",
+  "version": "1.0.0",
+  "description": "A local-first developer assistant for your terminal — an agent with markdown skills over your todos, GitHub and LeetCode: summaries, spaced-repetition revision, placement plans, and a scheduler with no background process.",
   "keywords": [
     "swale",
     "cli",
@@ -23,7 +23,11 @@
     "tui",
     "ink",
     "tool-calling",
-    "backup"
+    "backup",
+    "skills",
+    "leetcode-revision",
+    "spaced-repetition",
+    "placements"
   ],
   "homepage": "https://github.com/sayantanghosh-in/swale#readme",
   "bugs": {
@@ -41,7 +45,8 @@
     "swale": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "engines": {
     "node": ">=24"
@@ -49,7 +54,7 @@
   "scripts": {
     "dev": "tsx index.ts",
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepublishOnly": "pnpm typecheck && pnpm build",
@@ -64,6 +69,7 @@
     "@ai-sdk/provider": "^4.0.18",
     "@inquirer/prompts": "^8.6.0",
     "@octokit/auth-oauth-device": "^8.0.5",
+    "@resvg/resvg-js": "^2.6.2",
     "adm-zip": "^0.6.1",
     "ai": "^7.0.65",
     "chalk": "^6.0.0",

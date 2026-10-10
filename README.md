@@ -37,7 +37,7 @@ One SQLite file on your machine. No account, no server, no sync, no telemetry.
 
 ### 🤖 It can actually do things
 
-Thirteen tools over your own data. Ask it to mark something done and it runs the write.
+Skills and tools over your own data — summaries, LeetCode revision, placement plans. It runs the write, not a description of one.
 
 </td>
 <td width="33%" valign="top">
@@ -98,6 +98,9 @@ Your token and API keys live in a separate `0600` file, so exporting data never 
   - [`swale logout`](#swale-logout)
   - [Global options](#global-options)
 - [Connecting an LLM](#connecting-an-llm)
+- [Skills](#skills)
+- [Today and the schedule](#today-and-the-schedule)
+- [Sharing your progress](#sharing-your-progress)
 - [How the agent works](#how-the-agent-works)
 - [Data storage](#data-storage)
 - [Backup and restore](#backup-and-restore)
@@ -115,7 +118,7 @@ Swale keeps the things a developer accumulates during a working day — a task, 
 |                              |                                                                                                                           |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **No server, no account**    | Your records live in a single SQLite file on your machine. Nothing is uploaded, nothing is tracked.                       |
-| **An agent with real tools** | Thirteen of them, over your own data. Ask it to mark something done and it runs the write, rather than describing one.    |
+| **An agent with real tools** | Over your own data, plus markdown skills you can write or install. Ask it to mark something done and it runs the write.   |
 | **Any model you like**       | Point it at Ollama on your laptop, or OpenAI, Anthropic or Groq. A local model costs nothing to run.                      |
 | **Credentials kept apart**   | Your GitHub token and API keys live in a separate `0600` config file, so exporting or copying your data never leaks them. |
 | **Portable**                 | `swale backup` zips it up, `swale restore` puts it on the next machine.                                                   |
@@ -273,15 +276,37 @@ Send a second question while the first is still running and it waits its turn �
 
 #### Slash commands
 
-| Command         | Does                                                      |
-| --------------- | --------------------------------------------------------- |
-| `/model`        | Show the current model, and every model installed locally |
-| `/model <name>` | Switch to it                                              |
-| `/clear`        | Forget the conversation so far                            |
-| `/help`         | List these                                                |
-| `/quit`         | Leave                                                     |
+Type `/` and the palette opens above the prompt: it filters as you type, `↑`/`↓` move the highlight, `tab` completes, and `enter` on a half-typed command runs the highlighted one. Every one of them also works from the shell — `/summary month` is `swale summary month`.
 
-`/model` with no argument lists what Ollama already has pulled and marks the active one. `/model` only changes the model — to change provider entirely, run `swale llm`.
+| Command                                | Does                                                                        |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| **Session**                            |                                                                             |
+| `/model [name]`                        | Show the current model and everything Ollama has pulled; switch with a name |
+| `/clear`                               | Forget the conversation                                                     |
+| `/help`                                | Every command, grouped like this table                                      |
+| `/quit`                                | Leave                                                                       |
+| **You**                                |                                                                             |
+| `/profile [set <field> <value>]`       | Your role, stack and goal — every skill reads them                          |
+| `/memory [add <text> \| forget <n>]`   | What swale remembers about you                                              |
+| `/repos [add\|remove <path>]`          | Local git folders it can read. `add ~/code` adds every repo inside          |
+| **Daily**                              |                                                                             |
+| `/today`                               | This period's scheduled results again                                       |
+| `/summary [week\|month\|all]`          | LeetCode and GitHub summary with metrics                                    |
+| `/calendar [github\|leetcode]`         | Draw either calendar                                                        |
+| `/revise [next \| done <n>]`           | LeetCode problems due for revision                                          |
+| `/pulse`                               | Projects going stale                                                        |
+| **Placements**                         |                                                                             |
+| `/plan`                                | A seven-day plan from your weakest topics                                   |
+| `/interview [topic]`                   | Mock interview                                                              |
+| `/resume`                              | Resume bullets from your repos and LeetCode                                 |
+| `/brag [all]`                          | Your achievement log                                                        |
+| **Skills and schedule**                |                                                                             |
+| `/skills [add <url> \| remove <name>]` | Installed skills                                                            |
+| `/schedule [run <skill>]`              | What runs when; run one now                                                 |
+| **Sharing**                            |                                                                             |
+| `/card [week\|month]`                  | A shareable image of your progress                                          |
+
+The skill commands are not hard-coded. Each one is generated from a skill's own frontmatter, so installing a skill adds its command — see [Skills](#skills).
 
 #### Attaching files
 
@@ -565,6 +590,80 @@ API keys are entered masked and written to `~/.swale/config.json` with `0600` pe
 
 ---
 
+## Skills
+
+A skill is a recipe in markdown. Built-in skills ship inside the package; yours live in `~/.swale/skills/<name>/SKILL.md` and win on a name clash, so any built-in can be rewritten without forking swale.
+
+```markdown
+---
+name: summary
+description: LeetCode and GitHub summary with metrics
+args: "[week|month|all]"
+data: summary
+schedule: weekly monday
+group: Daily
+---
+
+Write two or three short lines about this period. Lead with the clearest
+change against the previous period, with its number…
+```
+
+Most skills have two halves. The **data step** (`data:`) is plain code: it fetches and computes, draws its tables and calendars straight onto the screen, and is instant and always correct. The **body** is instructions for the model, which then writes a few lines from the numbers — and only ever sees the numbers, never the drawing. Without a model configured you still get the first half.
+
+A skill with no `data:` is a **chat skill**: running it starts a conversation that follows the body, limited to the `tools:` it lists. `/interview` is one.
+
+| Built-in    | Kind | Runs           |
+| ----------- | ---- | -------------- |
+| `summary`   | data | weekly, Monday |
+| `calendar`  | data | on demand      |
+| `revise`    | data | daily          |
+| `pulse`     | data | weekly, Monday |
+| `plan`      | data | weekly, Monday |
+| `resume`    | data | on demand      |
+| `brag`      | data | weekly, Monday |
+| `interview` | chat | on demand      |
+
+Install one from GitHub — a repo, a folder in a repo, or a `SKILL.md` page:
+
+```bash
+swale skills add https://github.com/you/swale-skills/tree/main/standup
+```
+
+The frontmatter (`name`, `description`) matches the Agent Skills format, so many public `SKILL.md` files install as they are.
+
+### LeetCode revision
+
+Any problem you got wrong is worth seeing again, even if you got it right ten minutes later — the struggle is the signal. swale reads your recent submissions and brings each one back after **1, 3 and 7 days**. A revisit counts when you submit an accepted answer on or after its due date; `/revise done <n>` marks one by hand, and `/revise next` opens the first one.
+
+## Today and the schedule
+
+Skills can say when they should run: `daily`, `weekly <day>` or `monthly`. **There is no background process.** Nothing runs while swale is closed. When it opens — and every few minutes while it stays open — anything whose period has passed runs once, and its results appear at the top of the conversation.
+
+Each run is stamped with its period (`2026-10-10`, `2026-W41`, `2026-10`) and the database refuses a second row for the same one, so a week away means one catch-up run, never seven. The numbers appear the moment they exist; the model's lines follow when they are ready.
+
+To see what is due without opening swale, add one line to your shell startup:
+
+```bash
+# ~/.zshrc or ~/.bashrc
+swale brief --run
+```
+
+```
+swale 🔁 3 LeetCode revisions due  ·  📊 5 updates ready (swale today)
+```
+
+`brief` reads what is already stored, so it is quick; `--run` also does any due data steps, without the model, so opening a terminal never waits on an LLM.
+
+## Sharing your progress
+
+```bash
+swale card month
+```
+
+<img src="docs/images/card.png" alt="A swale card: GitHub commits, pull requests and active days with a contribution grid, beside LeetCode solved count, streak and contest rating with a submission grid" width="920">
+
+A 2400×1260 PNG, drawn locally — SVG rendered with the fonts already on your machine, no browser and nothing uploaded. Saved under `~/.swale/cards/`.
+
 ## How the agent works
 
 `swale chat` and the dashboard prompt both run the same agent, built on the [Vercel AI SDK](https://sdk.vercel.ai). Three files:
@@ -627,6 +726,20 @@ set_todo_status({ match: "blog post", status: "done" });
 ```
 
 Ids still work when there is one. Where a lookup can fail, the error carries a `hint`, because a tool result goes straight back into the conversation: **an error message is really a prompt.**
+
+### What changed in v1.0.0, and why
+
+**Each skill is its own tool, named after itself.** The first design had one `use_skill(skill, input)` tool. A 7B model does not make that indirection: asked for a summary, it called a tool named `summary` — which did not exist, and Ollama silently drops calls to tools it was not given, so the turn came back empty. Naming the tool after the skill is the shape the model already reaches for.
+
+**Tools draw; the model talks.** A skill's tables and calendars go straight to the screen through `ctx.emit`, and the model gets plain facts. That is why "show my GitHub calendar" works — the model never has to draw a 182-cell grid in text.
+
+**The tool call is forced only when the message asks for data or a change.** Forcing it on "hello" made a 7B model fail about half the time, and a greeting cannot fabricate a write. Messages that mention todos, spending, LeetCode, a summary and so on still must start with a tool call — the protection sits exactly where the risk is. Any prose the model writes before its first tool call is held back, and a refused turn is retried once silently, so a miss never reaches the screen.
+
+**An 8K context window for local models.** Ollama loads models with 4,096 tokens unless asked otherwise and truncates from the front without warning. swale's tools and instructions come to about 4,500, so the part that teaches the model how to call a tool was being cut off. swale now asks for 8,192; override with `"numCtx"` in the `llm` block of `config.json`.
+
+**When the model leaves out an argument, the skill reads it from what you asked.** "Summary of this month" once ran the weekly summary and reported the week's numbers as the month's — worse than failing.
+
+With these, `qwen2.5:7b` answered 21 of 21 realistic prompts in testing, from "hello" to "write resume bullets for me".
 
 ### A note on model size
 
@@ -714,17 +827,21 @@ The default client ID is public by design — the device flow uses no client sec
 
 ## Roadmap
 
-**v0.3.0 — this release.** The agent, and the dashboard to talk to it from.
+**v1.0.0 — this release.** From a dashboard you look at to something that does work for you.
 
-- An Ink dashboard on the bare `swale` command: both contribution calendars, your numbers, and a prompt.
-- Contribution calendars in `swale gh sync` and `swale lc`, with current and longest streaks.
-- An agent over your own data, built on the Vercel AI SDK — thirteen tools covering todos, notes, spending, GitHub and LeetCode. `swale chat` and the dashboard prompt both run it.
-- `swale backup` and `swale restore`, so a new machine is one command away.
-- Markdown rendering for replies, a full-width composer pinned to the bottom, a prompt queue with `esc` to abort, prompt history on `↑`, `/model` and friends, and file and image attachments (recognised and shown, not yet read).
+- **Skills** — markdown recipes, eight built in (`summary`, `calendar`, `revise`, `pulse`, `plan`, `resume`, `brag`, `interview`), installable from GitHub, each one a slash command and a CLI command.
+- **A scheduler with no background process** — scheduled skills run when swale opens, once per period, with catch-up; `swale brief` for your shell startup.
+- **LeetCode spaced repetition** from your real submissions.
+- **A profile and memory**, read by every skill and by the agent.
+- **Local repos** — `/repos add ~/code`, then "what did I commit this week?" works.
+- **`swale card`** — a shareable image of your progress.
+- **An instant dashboard** — drawn from cache, refreshed behind it.
+- **A palette** that filters, scrolls and completes across 19 commands.
+- A sturdier agent on small models — see [What changed in v1.0.0](#what-changed-in-v100-and-why).
 
-**v0.2.0.** GitHub sign-in and sync, LeetCode stats, and a configurable LLM with a streaming chat command.
+**v0.3.0.** The Ink dashboard, the agent, contribution calendars, backup and restore.
 
-**Next.** Readers for the files you can already attach — CSV and Markdown first, then PDF and Excel — so the agent can answer questions about them. A morning digest worth reading. Letting the agent act on a schedule rather than only when asked.
+**v0.2.0.** GitHub sign-in and sync, LeetCode stats, and a configurable LLM.
 
 ---
 

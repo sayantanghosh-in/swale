@@ -21,6 +21,8 @@ type ComposerProps = {
   provider: string;
   model: string;
   width: number;
+  /** Set while the slash palette is open: arrows move its selection and tab completes. */
+  palette?: { move: (delta: number) => void; complete: () => string | null };
 };
 
 export function Composer({
@@ -36,6 +38,7 @@ export function Composer({
   provider,
   model,
   width,
+  palette,
 }: ComposerProps) {
   const [cursor, setCursor] = useState(value.length);
   const [clipboardImage, setClipboardImage] = useState<string | null>(null);
@@ -150,6 +153,17 @@ export function Composer({
        * With text already typed, up and down move inside it instead — pulling
        * history out from under a half-written question would lose it.
        */
+      // With the palette open, the arrows belong to it, not to prompt history.
+      if (palette && (key.upArrow || key.downArrow)) {
+        palette.move(key.upArrow ? -1 : 1);
+        return;
+      }
+      if (palette && key.tab) {
+        const completed = palette.complete();
+        if (completed) setBoth(completed, completed.length);
+        return;
+      }
+
       if (key.upArrow) {
         if (!value.length) {
           const previous = recallPrevious();

@@ -135,9 +135,90 @@ export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
  * Slash commands
  * ----------------------------------------------------------------------- */
 
-export const SLASH_COMMANDS: { name: string; args?: string; description: string }[] = [
-  { name: "/model", args: "[name]", description: "Show or switch the model swale talks to" },
-  { name: "/clear", description: "Forget the conversation so far" },
-  { name: "/help", description: "List these commands" },
-  { name: "/quit", description: "Leave swale" },
+export type SlashCommand = { name: string; args?: string; description: string; group: string };
+
+/**
+ * Commands that are not skills. Skill commands (/summary, /revise, ...) are
+ * added at runtime from each skill's frontmatter, so installing a skill adds
+ * its command and the palette never drifts out of date.
+ */
+export const SLASH_COMMANDS: SlashCommand[] = [
+  { name: "/model", args: "[name]", description: "Show or switch the model", group: "Session" },
+  { name: "/clear", description: "Forget the conversation", group: "Session" },
+  { name: "/help", description: "List every command", group: "Session" },
+  { name: "/quit", description: "Leave swale", group: "Session" },
+  {
+    name: "/profile",
+    args: "[set <field> <value>]",
+    description: "Your role, stack and goal",
+    group: "You",
+  },
+  {
+    name: "/memory",
+    args: "[add <text> | forget <n>]",
+    description: "What swale remembers about you",
+    group: "You",
+  },
+  {
+    name: "/repos",
+    args: "[add|remove <path>]",
+    description: "Local git folders swale can read",
+    group: "You",
+  },
+  { name: "/today", description: "Show today's section again", group: "Daily" },
+  {
+    name: "/skills",
+    args: "[add <url> | remove <name>]",
+    description: "Installed skills",
+    group: "Skills and schedule",
+  },
+  {
+    name: "/schedule",
+    args: "[run <skill>]",
+    description: "What runs when; force a run",
+    group: "Skills and schedule",
+  },
+  { name: "/card", args: "[week|month]", description: "Make a shareable image", group: "Sharing" },
 ];
+
+/** Order the groups appear in /help. */
+export const SLASH_GROUPS = [
+  "Session",
+  "You",
+  "Daily",
+  "Placements",
+  "Skills and schedule",
+  "Sharing",
+  "Installed",
+];
+
+/** Rows the palette may use; the same rows the overlay keeps reserved. */
+export const PALETTE_ROWS = 4;
+
+/** Spaced repetition for LeetCode: days until each revisit. */
+export const REVISION_INTERVALS = [1, 3, 7];
+
+/** A project with no commits for this many days counts as going stale. */
+export const STALE_PROJECT_DAYS = 21;
+
+/** Built-in skills ship in the package; installed ones live in the data dir. */
+export const SKILLS_DIR_NAME = "skills";
+export const CARDS_DIR_NAME = "cards";
+
+/** While the dashboard stays open, look for due skills this often. */
+export const SCHEDULE_RECHECK_MS = 5 * 60 * 1000;
+
+export const PROFILE_ROLES = ["student", "employed", "freelancer", "hobbyist"] as const;
+
+/*
+ * Context window to ask Ollama for.
+ *
+ * Ollama loads models with a 4096-token window unless told otherwise, and it
+ * truncates silently from the front. swale's tool definitions plus its
+ * instructions come to about 4,500 tokens, so the start of every prompt — the
+ * part that teaches the model how to call a tool — was being cut off. The
+ * model then wrote tool names as plain text instead of calling them. 8192 fits
+ * with room for a conversation, and costs well under a gigabyte of extra
+ * memory on a 7B model. Override with `numCtx` in config.json.
+ */
+export const LOCAL_CONTEXT_TOKENS = 8192;

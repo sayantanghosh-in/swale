@@ -27,7 +27,7 @@ import {
   validateGithubLoginWithExistingConnection,
 } from "./connections/main.js";
 import { resolveAgentContext, runAgent } from "./agent.js";
-import { CALENDAR_WEEKS, COLORS } from "./constants.js";
+import { CALENDAR_WEEKS, COLORS, PROFILE_ROLES } from "./constants.js";
 import { calendarStats, fillCalendarWindow, leetcodeCalendarToDays, toDateKey } from "./utils.js";
 import { getContributionCalendar } from "./octokit.js";
 import { countTodosByStatus, listTodos } from "./todos/main.js";
@@ -36,6 +36,8 @@ import { summariseExpenses } from "./expenses/main.js";
 import { fetchLoginByProvider } from "./connections/main.js";
 import { getActiveUser } from "./users/main.js";
 import type { DashboardSnapshot } from "./models.js";
+import { readCache, writeCache } from "./cache/main.js";
+import { getProfile, setProfileField } from "./profile/main.js";
 
 async function queryLeetCode<T = any>(
   query: string,
@@ -210,6 +212,81 @@ export async function getLeetcodeProfileDetails(username: string): Promise<Leetc
   };
 }
 
+export type LeetcodeInsights = {
+  topics: { tag: string; level: "fundamental" | "intermediate" | "advanced"; solved: number }[];
+  contest: {
+    attended: number;
+    rating: number;
+    globalRanking: number;
+    topPercentage: number;
+  } | null;
+  acceptanceRate: number | null;
+  recent: { title: string; slug: string; timestamp: number; accepted: boolean }[];
+};
+
+/**
+ * The parts of a LeetCode profile the summary, revision and placement skills
+ * need beyond the basics: solved counts per topic, contest standing, and the
+ * recent submission list that revisions are built from.
+ */
+export async function getLeetcodeInsights(username: string): Promise<LeetcodeInsights> {
+  const query = `
+    query insights($username: String!) {
+      matchedUser(username: $username) {
+        tagProblemCounts {
+          advanced { tagName problemsSolved }
+          intermediate { tagName problemsSolved }
+          fundamental { tagName problemsSolved }
+        }
+        submitStatsGlobal {
+          acSubmissionNum { difficulty submissions }
+          totalSubmissionNum { difficulty submissions }
+        }
+      }
+      userContestRanking(username: $username) {
+        attendedContestsCount rating globalRanking topPercentage
+      }
+      recentSubmissionList(username: $username, limit: 20) {
+        title titleSlug timestamp statusDisplay
+      }
+    }
+  `;
+
+  const data = await queryLeetCode<any>(query, { username });
+  const counts = data?.matchedUser?.tagProblemCounts ?? {};
+  const topics: LeetcodeInsights["topics"] = [];
+  for (const level of ["fundamental", "intermediate", "advanced"] as const) {
+    for (const entry of counts[level] ?? []) {
+      topics.push({ tag: entry.tagName, level, solved: entry.problemsSolved ?? 0 });
+    }
+  }
+
+  const stats = data?.matchedUser?.submitStatsGlobal;
+  const accepted = stats?.acSubmissionNum?.find((d: any) => d.difficulty === "All")?.submissions;
+  const total = stats?.totalSubmissionNum?.find((d: any) => d.difficulty === "All")?.submissions;
+
+  const contest = data?.userContestRanking;
+  return {
+    topics,
+    contest:
+      contest && contest.attendedContestsCount > 0
+        ? {
+            attended: contest.attendedContestsCount,
+            rating: Math.round(contest.rating),
+            globalRanking: contest.globalRanking,
+            topPercentage: contest.topPercentage,
+          }
+        : null,
+    acceptanceRate: accepted && total ? Math.round((accepted / total) * 1000) / 10 : null,
+    recent: (data?.recentSubmissionList ?? []).map((sub: any) => ({
+      title: sub.title,
+      slug: sub.titleSlug,
+      timestamp: Number(sub.timestamp) * 1000,
+      accepted: sub.statusDisplay === "Accepted",
+    })),
+  };
+}
+
 const auth = createOAuthDeviceAuth({
   clientType: "oauth-app",
   clientId: process.env.SWALE_GITHUB_CLIENT_ID || "Ov23liJbUgcPQV2hYKX0",
@@ -345,6 +422,8 @@ export async function onboarding() {
             const username: string = await rl.question(
               "What is your leetcode username? It will be saved locally. [Press Enter to Skip]: ",
             );
+            // who they are shapes every skill, so ask once, up front
+            await askForProfile(linkedTo);
             // ask for LLM details
             const llmStatus = await askForLLMDetails();
             if (!llmStatus) {
@@ -418,6 +497,33 @@ export async function onboarding() {
     }
     return;
   }
+}
+
+/**
+ * Role, stack and goal. Asked during onboarding and by `swale profile`.
+ * Every answer is optional — an empty goal is better than an invented one.
+ */
+export async function askForProfile(userId: string): Promise<void> {
+  const current = getProfile(userId);
+  const role = (await select({
+    message: "Which describes you best?",
+    choices: PROFILE_ROLES.map((value) => ({
+      name: value[0]!.toUpperCase() + value.slice(1),
+      value,
+    })),
+    default: current.role ?? "student",
+  })) as string;
+  const stack = await input({
+    message: "Your main stack (e.g. React, Node, Python) — Enter to skip:",
+    default: current.stack ?? "",
+  });
+  const goal = await input({
+    message: "What are you working towards? (e.g. placements in December) — Enter to skip:",
+    default: current.goal ?? "",
+  });
+  setProfileField(userId, "role", role);
+  setProfileField(userId, "stack", stack);
+  setProfileField(userId, "goal", goal);
 }
 
 /**
@@ -504,7 +610,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
   const monthStart = toDateKey(new Date(now.getFullYear(), now.getMonth(), 1));
   const spend = summariseExpenses(user.id, monthStart);
 
-  return {
+  const snapshot: DashboardSnapshot = {
     user,
     githubLogin,
     leetcodeUsername,
@@ -526,6 +632,47 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
     },
     errors,
   };
+  // Only a clean fetch is worth keeping; a cached error would outlive its cause.
+  if (!errors.length) writeCache(`dashboard:${user.id}`, snapshot);
+  return snapshot;
+}
+
+/**
+ * The last dashboard that loaded cleanly, if there is one.
+ *
+ * The network half (calendars, LeetCode) is what made opening swale take five
+ * seconds. Todos, notes and spending are local and cheap, so those are always
+ * read fresh and laid over the cached network data.
+ */
+export function getCachedDashboard(): DashboardSnapshot | null {
+  const user = getActiveUser();
+  if (!user?.id) return null;
+  const cached = readCache<DashboardSnapshot>(`dashboard:${user.id}`);
+  if (!cached) return null;
+
+  const statusCounts = countTodosByStatus(user.id);
+  const now = new Date();
+  const spend = summariseExpenses(
+    user.id,
+    toDateKey(new Date(now.getFullYear(), now.getMonth(), 1)),
+  );
+  return {
+    ...cached.value,
+    user,
+    todos: {
+      open: statusCounts
+        .filter((row) => row.status !== "done")
+        .reduce((sum, row) => sum + row.total, 0),
+      recent: cached.value.todos.recent,
+    },
+    notes: { total: countNotes(user.id) },
+    expenses: {
+      monthTotal: spend.total,
+      monthCount: spend.count,
+      currency: user.currency ?? "INR",
+    },
+    asOf: cached.updatedAt,
+  };
 }
 
 /**
@@ -535,7 +682,7 @@ export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
  * something. A fresh prompt array each time would make every question the
  * first one.
  */
-export async function streamChat() {
+export async function streamChat(seed?: { content: string; activeTools?: string[] }) {
   let llm = getLlmDetails();
   if (!llm) {
     const status = await askForLLMDetails();
@@ -564,9 +711,20 @@ export async function streamChat() {
   console.log(chalk.gray("Ctrl+C to leave.\n"));
 
   const history: ModelMessage[] = [];
+  // Blocks a tool draws (calendars, summaries) are printed as they arrive.
+  const chatCtx = {
+    ...ctx,
+    emit: (block: { text: string }) => process.stdout.write(`${block.text}\n\n`),
+  };
+  let pending = seed;
 
   for (;;) {
-    const prompt = await input({ message: chalk.hex(COLORS.ORANGE)("you ›") });
+    // A chat skill (`swale interview`) starts the conversation itself.
+    const prompt = pending
+      ? pending.content
+      : await input({ message: chalk.hex(COLORS.ORANGE)("you ›") });
+    const activeTools = pending?.activeTools;
+    pending = undefined;
     if (!prompt.trim().length) continue;
     if (["exit", "quit", ":q"].includes(prompt.trim().toLowerCase())) return;
 
@@ -574,8 +732,9 @@ export async function streamChat() {
 
     let streamed = false;
     try {
-      const { text } = await runAgent(ctx, {
+      const { text } = await runAgent(chatCtx, {
         messages: history,
+        activeTools,
         onToolCall: ({ name }) => {
           process.stdout.write(chalk.gray(`  ⚙ ${name}\n`));
         },

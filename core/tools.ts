@@ -25,6 +25,10 @@ import { getContributionCalendar, listRepositories } from "./octokit.js";
 import { getLeetcodeProfileDetails } from "./services.js";
 import { calendarStats, fillCalendarWindow, leetcodeCalendarToDays, toDateKey } from "./utils.js";
 import { CALENDAR_WEEKS } from "./constants.js";
+import { loadSkills } from "./skills/main.js";
+import { chatSkillPrompt, runSkillData } from "./skills/runner.js";
+import { addMemory } from "./profile/main.js";
+import { gitLog, lastCommits, listRepos } from "./repos/main.js";
 
 /*
  * A tool is three things: a `description` the model reads to decide whether it
@@ -94,8 +98,56 @@ function resolveTodo(userId: string, ref: { id?: string; match?: string }): Todo
   }
   return { id: hits[0]!.id };
 }
+/*
+ * Every skill becomes a tool with the skill's own name.
+ *
+ * The first design had one `use_skill(skill, input)` tool. A 7B model does not
+ * make that indirection: asked for a summary, it calls a tool named `summary`,
+ * which did not exist, and Ollama silently drops calls to unknown tools — so
+ * the turn came back empty. Naming the tool after the skill is the shape the
+ * model already reaches for.
+ *
+ * Data skills draw their blocks straight onto the screen through ctx.emit and
+ * hand the model only the plain facts. That is why "show my calendar" works:
+ * the model never has to draw a 182-cell grid in text.
+ */
+export function buildSkillTools(ctx: AgentContext): ToolSet {
+  const tools: ToolSet = {};
+  for (const skill of loadSkills()) {
+    tools[skill.name.replace(/-/g, "_")] = tool({
+      description: `${skill.description}.${skill.mode === "data" ? " The result is drawn on screen for the person; do not repeat it." : ""}`,
+      inputSchema: z.object({
+        input: z
+          .string()
+          .optional()
+          .describe(
+            skill.args
+              ? `Optional, one of: ${skill.args
+                  .replace(/[[\]]/g, "")
+                  .split("|")
+                  .map((part) => part.trim())
+                  .join(", ")}`
+              : "Optional",
+          ),
+      }),
+      execute: async ({ input }) => {
+        if (skill.mode === "chat") return { instructions: chatSkillPrompt(skill, input ?? "") };
+        const data = await runSkillData(skill, ctx, input ?? "");
+        for (const block of data.blocks) ctx.emit?.(block);
+        return {
+          shownOnScreen: data.blocks.length > 0,
+          facts: data.facts,
+          note: "Already on screen. Do not repeat these numbers; add one or two lines at most.",
+        };
+      },
+    });
+  }
+  return tools;
+}
+
 export function buildTools(ctx: AgentContext): ToolSet {
   return {
+    ...buildSkillTools(ctx),
     /*
      * The escape hatch for the forced first tool call.
      *
@@ -105,15 +157,46 @@ export function buildTools(ctx: AgentContext): ToolSet {
      * warning about nothing being saved. This gives the model a truthful way
      * to say "this needs no data", and keeps the choice explicit.
      */
+    remember: tool({
+      description:
+        "Save a lasting fact the person tells you about themselves — their goal, college, target companies, a preference. Not for todos or notes.",
+      inputSchema: z.object({ fact: z.string().min(3) }),
+      execute: async ({ fact }) => addMemory(ctx.userId, fact),
+    }),
+
+    list_repos: tool({
+      description: "The local git repositories the person registered, with each one's last commit.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const repos = listRepos(ctx.userId);
+        if (!repos.length)
+          return { repos: [], hint: "None registered. They can add some with /repos add ~/code" };
+        return { repos: await lastCommits(repos) };
+      },
+    }),
+
+    git_log: tool({
+      description:
+        "Recent commits across the person's registered local repositories. Use for 'what did I work on' questions.",
+      inputSchema: z.object({
+        days: z.number().int().min(1).max(365).default(7),
+        repo: z.string().optional().describe("Limit to one repository by name"),
+      }),
+      execute: async ({ days, repo }) => {
+        const repos = listRepos(ctx.userId).filter((path) => !repo || path.endsWith(`/${repo}`));
+        if (!repos.length) return { commits: [], hint: "No matching registered repositories." };
+        return { commits: (await gitLog(repos, days, 40)).slice(0, 60) };
+      },
+    }),
+
     respond_directly: tool({
       description:
         "Answer from your own knowledge, without reading or changing anything in swale. Only for conversation and general questions. Never use this when asked to add, update, finish or delete something, and never when asked about the person's own todos, notes, spending, GitHub or LeetCode — those need a real tool.",
-      inputSchema: z.object({
-        reason: z.string().describe("Why no swale data is needed, in a few words"),
-      }),
-      execute: async ({ reason }) => ({
+      // No arguments. With a required `reason`, a 7B model often wrote the call
+      // out as text instead of making it; with nothing to compose, it calls.
+      inputSchema: z.object({}),
+      execute: async () => ({
         acknowledged: true,
-        reason,
         note: "Nothing was read and nothing was changed. Do not claim otherwise.",
       }),
     }),

@@ -8,12 +8,12 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 // node imports
 import fs, { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 // local imports
 import type { CalendarDay, CalendarStats, LLMConfig, PackageJsonContents } from "./models.js";
-import { BACKUP_DIR_NAME } from "./constants.js";
+import { BACKUP_DIR_NAME, LOCAL_CONTEXT_TOKENS } from "./constants.js";
 
 /**
  * Locates this package's own package.json by walking up from this file's
@@ -33,6 +33,12 @@ const findPackageJsonPath = (): string | undefined => {
   }
 
   return undefined;
+};
+
+/** The installed package's own folder — where the built-in skills ship. */
+export const packageRoot = (): string | undefined => {
+  const file = findPackageJsonPath();
+  return file ? path.dirname(file) : undefined;
 };
 
 export const parsePackageJsonContents = (): PackageJsonContents => {
@@ -276,6 +282,14 @@ export async function askForLLMDetails(): Promise<{ success: boolean }> {
   }
 }
 
+/** Per-provider call options. Only local models need any today: the context window. */
+export function llmProviderOptions(
+  llm: LLMConfig,
+): Record<string, Record<string, any>> | undefined {
+  if (llm.type !== "local") return undefined;
+  return { ollama: { options: { num_ctx: llm.numCtx ?? LOCAL_CONTEXT_TOKENS } } };
+}
+
 export function resolveModel(llm: LLMConfig): LanguageModel {
   if (llm.type === "local") {
     const ollama = createOllama({
@@ -408,4 +422,25 @@ export function heatLevel(count: number, max: number): number {
   if (ratio > 0.5) return 3;
   if (ratio > 0.25) return 2;
   return 1;
+}
+
+/** Opens a URL in the default browser without waiting for it. */
+export function openInBrowser(url: string): boolean {
+  const [command, args] =
+    process.platform === "darwin"
+      ? ["open", [url]]
+      : process.platform === "win32"
+        ? ["cmd", ["/c", "start", "", url]]
+        : ["xdg-open", [url]];
+  try {
+    spawn(command as string, args as string[], { detached: true, stdio: "ignore" }).unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whole days between an ISO date and now. */
+export function daysSince(iso: string): number {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
 }

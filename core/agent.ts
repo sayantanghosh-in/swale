@@ -4,9 +4,11 @@ import { stepCountIs, ToolChoiceViolationError, ToolLoopAgent, type ModelMessage
 import { AGENT_MAX_STEPS } from "./constants.js";
 import type { AgentContext, AgentToolEvent } from "./models.js";
 import { buildTools } from "./tools.js";
-import { getLlmDetails, resolveModel, toDateKey } from "./utils.js";
+import { getLlmDetails, llmProviderOptions, resolveModel, toDateKey } from "./utils.js";
 import { getActiveUser } from "./users/main.js";
 import { fetchLoginByProvider } from "./connections/main.js";
+import { getProfile, listMemories } from "./profile/main.js";
+import { loadSkills } from "./skills/main.js";
 
 /*
  * The system prompt is the agent's job description.
@@ -30,9 +32,8 @@ function instructionsFor(ctx: AgentContext): string {
     `Money is in ${ctx.currency}.`,
     "",
     "HOW YOU WORK",
-    "Every answer begins with a tool call. If the question genuinely needs no",
-    "data from swale and asks for no change, call respond_directly and then",
-    "answer normally — that is the whole of its purpose.",
+    "Anything about their todos, notes, spending, GitHub, LeetCode, projects or",
+    "plans needs a tool. Greetings and general questions do not — just answer.",
     "",
     "You cannot change anything by saying so. Saving a todo, an expense or a note",
     "happens only when you call the matching tool and it returns success:true.",
@@ -57,7 +58,24 @@ function instructionsFor(ctx: AgentContext): string {
     ctx.leetcodeUsername
       ? `LeetCode account: ${ctx.leetcodeUsername}.`
       : "No LeetCode account is linked.",
-  ].join("\n");
+    "",
+    "ABOUT THEM",
+    ctx.profile?.role ? `They are a ${ctx.profile.role}.` : "Their role is unknown.",
+    ctx.profile?.stack ? `Stack: ${ctx.profile.stack}.` : "",
+    ctx.profile?.goal ? `Goal: ${ctx.profile.goal}.` : "",
+    ...(ctx.memories ?? []).map((memory) => `- ${memory}`),
+    "When they tell you something lasting about themselves, call remember.",
+    "",
+    "SKILLS",
+    "For anything below, call use_skill rather than assembling it yourself:",
+    ...loadSkills().map(
+      (skill) => `- ${skill.name}: ${skill.description}${skill.args ? ` ${skill.args}` : ""}`,
+    ),
+    "When use_skill says shownOnScreen, the numbers are already on screen.",
+    "Do not repeat or redraw them. Add one or two lines at most.",
+  ]
+    .filter((line) => line !== undefined)
+    .join("\n");
 }
 
 /** Reads who is signed in. Returns null when nobody is, so callers can prompt. */
@@ -74,6 +92,8 @@ export function resolveAgentContext(): AgentContext | null {
     currency: user.currency ?? "INR",
     githubLogin: github?.success ? github.login : null,
     leetcodeUsername: leetcode?.success ? leetcode.login : null,
+    profile: getProfile(user.id),
+    memories: listMemories(user.id).map((memory) => memory.text),
   };
 }
 
@@ -82,14 +102,37 @@ export function resolveAgentContext(): AgentContext | null {
  * run whatever tools it asked for, hand the results back, ask again. `stopWhen`
  * is the brake — without it a model that keeps calling tools never returns.
  */
-export function createSwaleAgent(ctx: AgentContext) {
+/*
+ * Which messages must start with a tool call.
+ *
+ * Forcing a call exists to stop one failure: the model announcing a change it
+ * never made, or quoting a number it never read. Both only happen when the
+ * message asks for data or a change — and those always name the thing ("add",
+ * "spent", "todo", "leetcode", "summary"). A greeting cannot fabricate a
+ * write, and forcing a tool on "hello" made a 7B model fail roughly half the
+ * time. So the rule applies exactly where the risk is.
+ */
+const NEEDS_DATA =
+  /\b(add|create|record|save|log|note|notes|todo|todos|task|tasks|mark|done|finish|complete|delete|remove|update|change|edit|spent|spend|spending|expense|expenses|paid|bought|cost|money|budget|leetcode|problem|problems|solved|revise|revision|topic|topics|github|repo|repos|commit|commits|project|projects|calendar|streak|summary|stats|plan|resume|brag|interview|remember|forget|week|month|today|yesterday|how much|how many)\b|₹|\$/i;
+
+export const needsData = (message: string): boolean => NEEDS_DATA.test(message);
+
+export function createSwaleAgent(ctx: AgentContext, activeTools?: string[], mustUseTool = true) {
   const llm = getLlmDetails();
   if (!llm) throw new Error("ERROR_NO_LLM_FOUND");
 
   return new ToolLoopAgent({
     model: resolveModel(llm),
+    providerOptions: llmProviderOptions(llm),
     instructions: instructionsFor(ctx),
     tools: buildTools(ctx),
+    /*
+     * A skill's own turn only gets the tools it lists, plus respond_directly
+     * so the forced first call can always be satisfied.
+     */
+    ...(activeTools?.length
+      ? { activeTools: [...new Set([...activeTools, "respond_directly"])] }
+      : {}),
     stopWhen: stepCountIs(AGENT_MAX_STEPS),
     temperature: 0,
     /*
@@ -102,12 +145,14 @@ export function createSwaleAgent(ctx: AgentContext) {
      *
      * The cost is that small talk also spends a tool call. Worth it.
      */
-    prepareStep: ({ stepNumber }) => (stepNumber === 0 ? { toolChoice: "required" } : {}),
+    prepareStep: ({ stepNumber }) =>
+      stepNumber === 0 && mustUseTool ? { toolChoice: "required" } : {},
   });
 }
 
 export type AgentRunOptions = {
   messages: ModelMessage[];
+  activeTools?: string[];
   onToolCall?: (event: AgentToolEvent) => void;
   onText?: (chunk: string) => void;
   abortSignal?: AbortSignal;
@@ -134,9 +179,33 @@ function readableError(error: unknown): Error {
  */
 export async function runAgent(
   ctx: AgentContext,
-  { messages, onToolCall, onText, abortSignal }: AgentRunOptions,
+  options: AgentRunOptions,
 ): Promise<{ text: string; toolCalls: AgentToolEvent[] }> {
-  const agent = createSwaleAgent(ctx);
+  /*
+   * One silent retry when the model answers without calling a tool.
+   *
+   * On a 7B model this happens roughly one turn in five, at random — the same
+   * question succeeds on the next attempt. Nothing from the refused attempt
+   * reached the screen (see below), so retrying costs a few seconds and the
+   * person never sees the miss.
+   */
+  try {
+    return await runAgentOnce(ctx, options);
+  } catch (error) {
+    if (!(error instanceof RefusedTurnError) || options.abortSignal?.aborted) throw error;
+    return runAgentOnce(ctx, options);
+  }
+}
+
+class RefusedTurnError extends Error {}
+
+async function runAgentOnce(
+  ctx: AgentContext,
+  { messages, onToolCall, onText, abortSignal, activeTools }: AgentRunOptions,
+): Promise<{ text: string; toolCalls: AgentToolEvent[] }> {
+  const last = [...messages].reverse().find((message) => message.role === "user");
+  const utterance = typeof last?.content === "string" ? last.content : "";
+  const agent = createSwaleAgent({ ...ctx, utterance }, activeTools, needsData(utterance));
   const toolCalls: AgentToolEvent[] = [];
 
   /*
@@ -168,13 +237,22 @@ export async function runAgent(
   /*
    * fullStream, not textStream: textStream drops error parts on the floor, so
    * a turn the SDK rejected still comes back looking like a normal answer.
+   *
+   * Text is held back until the first tool has run. The first step must call
+   * a tool, so any prose before that is the model skipping the rule — and
+   * showing it would put an ungrounded answer on screen just before the retry.
    */
   let text = "";
+  let held = "";
   let failure: unknown = null;
 
   try {
     for await (const part of result.fullStream) {
       if (part.type === "text-delta") {
+        if (!toolCalls.length) {
+          held += part.text;
+          continue;
+        }
         text += part.text;
         onText?.(part.text);
       } else if (part.type === "error") {
@@ -185,7 +263,17 @@ export async function runAgent(
     console.error = realConsoleError;
   }
 
-  if (failure) throw readableError(failure);
+  if (failure) {
+    if (ToolChoiceViolationError.isInstance(failure))
+      throw new RefusedTurnError(readableError(failure).message);
+    throw readableError(failure);
+  }
+
+  // A turn that called tools and also spoke before them keeps that text.
+  if (held && !text) {
+    text = held;
+    onText?.(held);
+  }
 
   return { text, toolCalls };
 }

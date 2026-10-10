@@ -165,3 +165,63 @@ export function formatLeetcodeCalendar(days: CalendarDay[], activeYears: number[
   }
   return res;
 }
+
+/* --------------------------------------------------------------------------
+ * Metric blocks
+ * ----------------------------------------------------------------------- */
+
+/** "↑ 40%" / "↓ 12%" / "same" against the previous period, coloured to match. */
+export function formatDelta(current: number, previous: number | null | undefined): string {
+  if (previous === null || previous === undefined) return "";
+  if (previous === 0 && current === 0) return chalk.gray("same");
+  if (previous === 0) return chalk.green(`↑ new`);
+  const change = Math.round(((current - previous) / previous) * 100);
+  if (change === 0) return chalk.gray("same");
+  return change > 0 ? chalk.green(`↑ ${change}%`) : chalk.red(`↓ ${Math.abs(change)}%`);
+}
+
+/** One aligned row: label, value, optional comparison. */
+export function formatMetric(label: string, value: string | number, delta = ""): string {
+  return `  ${chalk.gray(label.padEnd(19))}${chalk.bold.white(String(value).padStart(7))}  ${delta}`;
+}
+
+export function formatHeading(text: string): string {
+  return chalk.bold.hex(COLORS.ORANGE)(text);
+}
+
+/**
+ * A row of squares, one per day, for windows too short for a full calendar.
+ * A week drawn as a 26-week grid is one lonely column.
+ */
+export function formatDayStrip(days: CalendarDay[], ramp: string[] = CALENDAR_RAMP_GREEN): string {
+  if (!days.length) return chalk.gray("  No activity data available.");
+  const max = days.reduce((top, day) => Math.max(top, day.count), 0);
+  const letters = days
+    .map((day) => new Date(`${day.date}T12:00:00`).toLocaleDateString("en", { weekday: "narrow" }))
+    .join(" ");
+  const cells = days
+    .map((day) => {
+      const level = heatLevel(day.count, max);
+      return chalk.hex(ramp[level] ?? ramp[0] ?? "#4A525C")(
+        level === 0 ? CALENDAR_EMPTY : CALENDAR_CELL,
+      );
+    })
+    .join(" ");
+  return `    ${chalk.gray(letters)}\n    ${cells}`;
+}
+
+/** A simple left-aligned table; the widest cell sets each column. */
+export function formatTable(rows: string[][], header?: string[]): string {
+  const all = header ? [header, ...rows] : rows;
+  const strip = (value: string) => value.replace(/\u001b\[[0-9;]*m/g, "");
+  const widths =
+    all[0]?.map((_, column) => Math.max(...all.map((row) => strip(row[column] ?? "").length))) ??
+    [];
+  const line = (row: string[], paint = (value: string) => value) =>
+    "  " +
+    row
+      .map((cell, column) => paint(cell) + " ".repeat((widths[column] ?? 0) - strip(cell).length))
+      .join("   ");
+  const out = rows.map((row) => line(row));
+  return header ? [line(header, (value) => chalk.gray(value)), ...out].join("\n") : out.join("\n");
+}

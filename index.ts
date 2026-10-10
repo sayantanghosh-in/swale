@@ -30,6 +30,18 @@ import { getContributionCalendar, listRepositories } from "./core/octokit.js";
 import { fetchLoginByProvider } from "./core/connections/main.js";
 import { executeBackupAction, executeRestoreAction } from "./core/backup/utils.js";
 import { renderDashboard } from "./tui/index.js";
+import { loadSkills } from "./core/skills/main.js";
+import {
+  executeBrief,
+  executeCard,
+  executeMemory,
+  executeProfile,
+  executeRepos,
+  executeSchedule,
+  executeSkillCommand,
+  executeSkills,
+  executeToday,
+} from "./core/skills/utils.js";
 import chalk from "chalk";
 
 const packageJsonContents = parsePackageJsonContents();
@@ -240,6 +252,73 @@ program
  * default command so commander still runs the preSubcommand onboarding hook —
  * checking argv by hand here would skip it.
  */
+// v1.0.0 — you, skills and schedule
+program
+  .command("profile")
+  .argument("[args...]", "set <role|stack|goal> <value>")
+  .description("Your role, stack and goal")
+  .action(async (args: string[]) => executeProfile(args));
+
+program
+  .command("memory")
+  .argument("[args...]", "add <text> | forget <n>")
+  .description("What swale remembers about you")
+  .action(async (args: string[]) => executeMemory(args));
+
+program
+  .command("repos")
+  .argument("[args...]", "add|remove <path>")
+  .description("Local git folders swale can read")
+  .action(async (args: string[]) => executeRepos(args));
+
+program
+  .command("today")
+  .description("This period's scheduled results and due revisions")
+  .action(async () => executeToday());
+
+program
+  .command("brief")
+  .option("--run", "also run anything due (numbers only, no model)")
+  .description("One line for your shell startup: what is due and ready")
+  .action(async (options: { run?: boolean }) => executeBrief(options));
+
+program
+  .command("schedule")
+  .argument("[verb]", "run <skill> | run-due")
+  .argument("[skill]")
+  .description("What runs when; run one now")
+  .action(async (verb?: string, skill?: string) => executeSchedule(verb, skill));
+
+program
+  .command("skills")
+  .argument("[verb]", "add <github-url> | remove <name>")
+  .argument("[target]")
+  .description("Installed skills")
+  .action(async (verb?: string, target?: string) => executeSkills(verb, target));
+
+program
+  .command("card")
+  .argument("[period]", "week | month")
+  .description("Make a shareable image of your progress")
+  .action(async (period?: string) => executeCard(period));
+
+/*
+ * One command per skill, read from the skills on disk — so installing a skill
+ * adds `swale <its-name>` as well as `/its-name`. A skill whose name clashes
+ * with a built-in command is left as a slash command only.
+ */
+const taken = new Set(
+  program.commands.flatMap((command) => [command.name(), ...command.aliases()]),
+);
+for (const skill of loadSkills()) {
+  if (taken.has(skill.name)) continue;
+  program
+    .command(skill.name)
+    .argument("[args...]", skill.args ?? "")
+    .description(skill.description)
+    .action(async (args: string[]) => executeSkillCommand(skill, args));
+}
+
 program
   .command("dashboard", { isDefault: true })
   .description("Your calendars, your numbers, and a prompt to ask about them")

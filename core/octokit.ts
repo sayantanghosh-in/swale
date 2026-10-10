@@ -130,3 +130,73 @@ export async function getContributionCalendar(
     return null;
   }
 }
+
+export type GithubPeriodStats = {
+  commits: number;
+  pullRequests: number;
+  issues: number;
+  reviews: number;
+  repos: { name: string; language: string | null; commits: number }[];
+  days: CalendarDay[];
+};
+
+/**
+ * Activity totals for one window. GitHub caps a contributions window at a
+ * year, so "all time" in swale means the last twelve months.
+ */
+export async function getContributionStats(
+  login: string,
+  from: Date,
+  to: Date,
+): Promise<GithubPeriodStats | null> {
+  if (!oct || !login) return null;
+
+  const query = `
+    query stats($login: String!, $from: DateTime!, $to: DateTime!) {
+      user(login: $login) {
+        contributionsCollection(from: $from, to: $to) {
+          totalCommitContributions
+          totalPullRequestContributions
+          totalIssueContributions
+          totalPullRequestReviewContributions
+          commitContributionsByRepository(maxRepositories: 5) {
+            repository { name primaryLanguage { name } }
+            contributions { totalCount }
+          }
+          contributionCalendar {
+            weeks { contributionDays { date contributionCount } }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await oct.graphql<any>(query, {
+      login,
+      from: from.toISOString(),
+      to: to.toISOString(),
+    });
+    const c = data?.user?.contributionsCollection;
+    if (!c) return null;
+    return {
+      commits: c.totalCommitContributions ?? 0,
+      pullRequests: c.totalPullRequestContributions ?? 0,
+      issues: c.totalIssueContributions ?? 0,
+      reviews: c.totalPullRequestReviewContributions ?? 0,
+      repos: (c.commitContributionsByRepository ?? []).map((entry: any) => ({
+        name: entry?.repository?.name ?? "",
+        language: entry?.repository?.primaryLanguage?.name ?? null,
+        commits: entry?.contributions?.totalCount ?? 0,
+      })),
+      days: (c.contributionCalendar?.weeks ?? []).flatMap((week: any) =>
+        (week?.contributionDays ?? []).map((day: any) => ({
+          date: day.date,
+          count: day.contributionCount,
+        })),
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
